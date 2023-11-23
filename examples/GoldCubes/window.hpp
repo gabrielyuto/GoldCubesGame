@@ -3,6 +3,8 @@
 
 #include "abcgOpenGL.hpp"
 
+#include <random>
+
 #include "camera.hpp"
 #include "ground.hpp"
 
@@ -11,6 +13,8 @@ struct Vertex {
 
   friend bool operator==(Vertex const &, Vertex const &) = default;
 };
+
+enum class RotationDirection { Right, Left, None };
 
 class Window : public abcg::OpenGLWindow {
 protected:
@@ -23,11 +27,39 @@ protected:
   void onUpdate() override;
 
 private:
+  struct Slenderman {
+    GLuint m_vao{};
+    GLuint m_vbo{};
+    GLuint m_ebo{};
+    std::vector<Vertex> m_vertices;
+    std::vector<GLuint> m_indices;
+  };
+
+  struct Box {
+    GLuint m_vao{};
+    GLuint m_vbo{};
+    GLuint m_ebo{};
+    std::vector<Vertex> m_vertices;
+    std::vector<GLuint> m_indices;
+  };
+
   glm::ivec2 m_viewportSize{};
+
+  Box m_box;
+  Slenderman m_slenderman;
 
   GLuint m_VAO{};
   GLuint m_VBO{};
   GLuint m_EBO{};
+
+  GLuint m_VAO_box{};
+  GLuint m_VBO_box{};
+  GLuint m_EBO_box{};
+
+  GLuint m_VAO_slender{};
+  GLuint m_VBO_slender{};
+  GLuint m_EBO_slender{};
+
   GLuint m_program{};
 
   GLint m_viewMatrixLocation{};
@@ -44,10 +76,9 @@ private:
 
   Ground m_ground;
 
-  std::vector<Vertex> m_vertices;
-  std::vector<GLuint> m_indices;
+  std::tuple<std::vector<Vertex>, std::vector<GLuint>>
+  loadModelFromFile(std::string_view path);
 
-  void loadModelFromFile(std::string_view path);
   void createCube();
 };
 

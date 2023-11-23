@@ -1,7 +1,7 @@
 # Computação Gráfica - UFABC
-## Atividade 2 - Aplicação gráfica 3D com animações
+## Atividade 3 - Aplicação interativa com gráficos 3D, iluminação e texturização
 
-Link WebAssembly: https://gabrielyuto.github.io/GoldCubes/public/GoldCubes.html
+Link WebAssembly: 
 
 ### Integrantes:
 Nomes:

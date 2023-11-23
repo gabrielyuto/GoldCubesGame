@@ -30,68 +30,94 @@ void Window::onCreate() {
   m_modelMatrixLocation = abcg::glGetUniformLocation(m_program, "modelMatrix");
   m_colorLocation = abcg::glGetUniformLocation(m_program, "color"); 
 
-  loadModelFromFile(assetsPath + "/objmodels/box.obj");
+  // ---------------------------------CREATE OBJECT BOX------------------------------------------------
+  auto const [vertices_box, indices_box] = loadModelFromFile(assetsPath + "/objmodels/box.obj");
 
-  abcg::glGenBuffers(1, &m_VBO);
-  abcg::glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
-  abcg::glBufferData(GL_ARRAY_BUFFER,
-                     sizeof(m_vertices.at(0)) * m_vertices.size(),
-                     m_vertices.data(), GL_STATIC_DRAW);
+  abcg::glGenBuffers(1, &m_VBO_box);
+  abcg::glBindBuffer(GL_ARRAY_BUFFER, m_VBO_box);
+  abcg::glBufferData(GL_ARRAY_BUFFER,sizeof(vertices_box.at(0)) * vertices_box.size(), vertices_box.data(), GL_STATIC_DRAW);
   abcg::glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-  abcg::glGenBuffers(1, &m_EBO);
-  abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
-  abcg::glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                     sizeof(m_indices.at(0)) * m_indices.size(),
-                     m_indices.data(), GL_STATIC_DRAW);
+  abcg::glGenBuffers(1, &m_EBO_box);
+  abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO_box);
+  abcg::glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices_box.at(0)) * indices_box.size(), indices_box.data(), GL_STATIC_DRAW);
   abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-  abcg::glGenVertexArrays(1, &m_VAO);
+  abcg::glGenVertexArrays(1, &m_VAO_box);
+  abcg::glBindVertexArray(m_VAO_box);
 
-  abcg::glBindVertexArray(m_VAO);
-
-  abcg::glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
+  abcg::glBindBuffer(GL_ARRAY_BUFFER, m_VBO_box);
 
   auto const positionAttribute{
-      abcg::glGetAttribLocation(m_program, "inPosition")};
+    abcg::glGetAttribLocation(m_program, "inPosition")
+  };
 
   abcg::glEnableVertexAttribArray(positionAttribute);
-  abcg::glVertexAttribPointer(positionAttribute, 3, GL_FLOAT, GL_FALSE,
-                              sizeof(Vertex), nullptr);
+  abcg::glVertexAttribPointer(positionAttribute, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
   abcg::glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-  abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
+  abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO_box);
 
   abcg::glBindVertexArray(0);
+
+  m_box = Box { m_VAO_box, m_VBO_box, m_EBO_box, vertices_box, indices_box };
+
+  // ---------------------------------CREATE OBJECT SLENDERMAN ------------------------------------------------
+
+  auto const [vertices_slender, indices_slender] = loadModelFromFile(assetsPath + "/objmodels/slenderman.obj");
+
+  abcg::glGenBuffers(1, &m_VBO_slender);
+  abcg::glBindBuffer(GL_ARRAY_BUFFER, m_VBO_slender);
+  abcg::glBufferData(GL_ARRAY_BUFFER, sizeof(vertices_slender.at(0)) * vertices_slender.size(), vertices_slender.data(), GL_STATIC_DRAW);
+  abcg::glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+  abcg::glGenBuffers(1, &m_EBO_slender);
+  abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO_slender);
+  abcg::glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices_slender.at(0)) * indices_slender.size(), indices_slender.data(), GL_STATIC_DRAW);
+  abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+  abcg::glGenVertexArrays(1, &m_VAO_slender);
+
+  abcg::glBindVertexArray(m_VAO_slender);
+
+  abcg::glBindBuffer(GL_ARRAY_BUFFER, m_VBO_slender);
+
+  auto const positionAttribute_slenderman{
+    abcg::glGetAttribLocation(m_program, "inPosition")
+  };
+
+  abcg::glEnableVertexAttribArray(positionAttribute_slenderman);
+  abcg::glVertexAttribPointer(positionAttribute_slenderman, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
+  abcg::glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+  abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO_slender);
+
+  abcg::glBindVertexArray(0);
+
+  m_slenderman = Slenderman{ m_VAO_slender, m_VBO_slender, m_EBO_slender, vertices_slender, indices_slender };
 }
 
 void Window::onPaint() {
   abcg::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
   abcg::glViewport(0, 0, m_viewportSize.x, m_viewportSize.y);
-
   abcg::glUseProgram(m_program);
-
-  abcg::glUniformMatrix4fv(m_viewMatrixLocation, 1, GL_FALSE,
-                           &m_camera.getViewMatrix()[0][0]);
-  abcg::glUniformMatrix4fv(m_projMatrixLocation, 1, GL_FALSE,
-                           &m_camera.getProjMatrix()[0][0]);
-
-  abcg::glBindVertexArray(m_VAO);
+  abcg::glUniformMatrix4fv(m_viewMatrixLocation, 1, GL_FALSE, &m_camera.getViewMatrix()[0][0]);
+  abcg::glUniformMatrix4fv(m_projMatrixLocation, 1, GL_FALSE, &m_camera.getProjMatrix()[0][0]);
 
   const int limit_sup{50};
   const int limit_inf{-50};
   
   for (int x = limit_inf; x < limit_sup; x++) {
     for (int z = limit_inf; z < limit_sup; z++) {
-      glm::mat4 model{1.0f};
-      model = glm::translate(model, glm::vec3(x, 0.5f, z));
-      model = glm::rotate(model, glm::radians(10.0f), glm::vec3(0, 1, 0));
-      model = glm::scale(model, glm::vec3(0.5f));
+      glm::mat4 model_box{1.0f};
+      model_box = glm::translate(model_box, glm::vec3(x, 0.5f, z));
+      model_box = glm::rotate(model_box, glm::radians(10.0f), glm::vec3(0, 1, 0));
+      model_box = glm::scale(model_box, glm::vec3(0.5f));
 
-      abcg::glUniformMatrix4fv(m_modelMatrixLocation, 1, GL_FALSE, &model[0][0]);
+      abcg::glBindVertexArray(m_box.m_vao);
+      abcg::glUniformMatrix4fv(m_modelMatrixLocation, 1, GL_FALSE, &model_box[0][0]);
       abcg::glUniform4f(m_colorLocation, x, (x + z), z, 1.0f);
-      abcg::glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, nullptr);                  
+      abcg::glDrawElements(GL_TRIANGLES, m_box.m_indices.size(), GL_UNSIGNED_INT, nullptr);                  
     }
   }
 
@@ -102,9 +128,10 @@ void Window::onPaint() {
       model = glm::rotate(model, glm::radians(40.0f), glm::vec3(0, 1, 0));
       model = glm::scale(model, glm::vec3(0.5f));
 
+      abcg::glBindVertexArray(m_box.m_vao);
       abcg::glUniformMatrix4fv(m_modelMatrixLocation, 1, GL_FALSE, &model[0][0]);
       abcg::glUniform4f(m_colorLocation, 0, 0, 0, 1.0f);
-      abcg::glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, nullptr);
+      abcg::glDrawElements(GL_TRIANGLES, m_box.m_indices.size(), GL_UNSIGNED_INT, nullptr);
     }
   }
 
@@ -115,9 +142,10 @@ void Window::onPaint() {
       model = glm::rotate(model, glm::radians(70.0f), glm::vec3(0, 1, 0));
       model = glm::scale(model, glm::vec3(0.5f));
 
+      abcg::glBindVertexArray(m_box.m_vao);
       abcg::glUniformMatrix4fv(m_modelMatrixLocation, 1, GL_FALSE, &model[0][0]);
       abcg::glUniform4f(m_colorLocation, x, (x + z), z, 1.0f);
-      abcg::glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, nullptr);
+      abcg::glDrawElements(GL_TRIANGLES, m_box.m_indices.size(), GL_UNSIGNED_INT, nullptr);
     }
   }
 
@@ -128,9 +156,10 @@ void Window::onPaint() {
       model = glm::rotate(model, glm::radians(80.0f), glm::vec3(0, 1, 0));
       model = glm::scale(model, glm::vec3(0.5f));
 
+      abcg::glBindVertexArray(m_box.m_vao);
       abcg::glUniformMatrix4fv(m_modelMatrixLocation, 1, GL_FALSE, &model[0][0]);
       abcg::glUniform4f(m_colorLocation, 0, 0, 0, 1.0f);
-      abcg::glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, nullptr);
+      abcg::glDrawElements(GL_TRIANGLES, m_box.m_indices.size(), GL_UNSIGNED_INT, nullptr);
     }
   }
 
@@ -141,9 +170,10 @@ void Window::onPaint() {
       model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0, 1, 0));
       model = glm::scale(model, glm::vec3(0.5f));
 
+      abcg::glBindVertexArray(m_box.m_vao);
       abcg::glUniformMatrix4fv(m_modelMatrixLocation, 1, GL_FALSE, &model[0][0]);
       abcg::glUniform4f(m_colorLocation, x, (x + z), z, 1.0f);
-      abcg::glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, nullptr);
+      abcg::glDrawElements(GL_TRIANGLES, m_box.m_indices.size(), GL_UNSIGNED_INT, nullptr);
     }
   }
 
@@ -156,11 +186,23 @@ void Window::onPaint() {
       model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0, 1, 0));
       model = glm::scale(model, glm::vec3(0.1f));
 
+      abcg::glBindVertexArray(m_box.m_vao);
       abcg::glUniformMatrix4fv(m_modelMatrixLocation, 1, GL_FALSE, &model[0][0]);
       abcg::glUniform4f(m_colorLocation, 255, 223, 0.0, 1.0f);
-      abcg::glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, nullptr);
+      abcg::glDrawElements(GL_TRIANGLES, m_box.m_indices.size(), GL_UNSIGNED_INT, nullptr);
     }
   }
+
+  // DRAW SLENDERMAN
+  glm::mat4 model_slenderman{1.0f};
+  model_slenderman = glm::translate(model_slenderman, glm::vec3(0, 0.5f, 2.3));
+  model_slenderman = glm::rotate(model_slenderman, glm::radians(180.0f), glm::vec3(0, 1, 0));
+  model_slenderman = glm::scale(model_slenderman, glm::vec3(0.001f));
+
+  abcg::glBindVertexArray(m_slenderman.m_vao);
+  abcg::glUniformMatrix4fv(m_modelMatrixLocation, 1, GL_FALSE, &model_slenderman[0][0]);
+  abcg::glUniform4f(m_colorLocation, 3.0, 1.0, 3.0, 1.0f);
+  abcg::glDrawElements(GL_TRIANGLES, m_slenderman.m_indices.size(), GL_UNSIGNED_INT, nullptr);         
 
   m_ground.paint();
 
@@ -191,50 +233,6 @@ void Window::onUpdate() {
   m_camera.dolly(m_dollySpeed * deltaTime);
   m_camera.truck(m_truckSpeed * deltaTime);
   m_camera.pan(m_panSpeed * deltaTime);
-}
-
-void Window::loadModelFromFile(std::string_view path) {
-  tinyobj::ObjReader reader;
-
-  if (!reader.ParseFromFile(path.data())) {
-    if (!reader.Error().empty()) {
-      throw abcg::RuntimeError(
-          fmt::format("Failed to load model {} ({})", path, reader.Error()));
-    }
-    throw abcg::RuntimeError(fmt::format("Failed to load model {}", path));
-  }
-
-  if (!reader.Warning().empty()) {
-    fmt::print("Warning: {}\n", reader.Warning());
-  }
-
-  auto const &attributes{reader.GetAttrib()};
-  auto const &shapes{reader.GetShapes()};
-
-  m_vertices.clear();
-  m_indices.clear();
-
-  std::unordered_map<Vertex, GLuint> hash{};
-
-  for (auto const &shape : shapes) {
-    for (auto const offset : iter::range(shape.mesh.indices.size())) {
-      auto const index{shape.mesh.indices.at(offset)};
-
-      auto const startIndex{3 * index.vertex_index};
-      auto const vx{attributes.vertices.at(startIndex + 0)};
-      auto const vy{attributes.vertices.at(startIndex + 1)};
-      auto const vz{attributes.vertices.at(startIndex + 2)};
-
-      Vertex const vertex{.position = {vx, vy, vz}};
-
-      if (!hash.contains(vertex)) {
-        hash[vertex] = m_vertices.size();
-        m_vertices.push_back(vertex);
-      }
-
-      m_indices.push_back(hash[vertex]);
-    }
-  }
 }
 
 void Window::onEvent(SDL_Event const &event) {
@@ -271,4 +269,53 @@ void Window::onEvent(SDL_Event const &event) {
     if (event.key.keysym.sym == SDLK_e && m_truckSpeed > 0)
       m_truckSpeed = 0.0f;
   }
+}
+
+std::tuple<std::vector<Vertex>, std::vector<GLuint>>
+Window::loadModelFromFile(std::string_view path) {
+  tinyobj::ObjReader reader;
+  std::vector<Vertex> vertices;
+  std::vector<GLuint> indices;
+
+  if (!reader.ParseFromFile(path.data())) {
+    if (!reader.Error().empty()) {
+      throw abcg::RuntimeError(
+          fmt::format("Failed to load model {} ({})", path, reader.Error()));
+    }
+    throw abcg::RuntimeError(fmt::format("Failed to load model {}", path));
+  }
+
+  if (!reader.Warning().empty()) {
+    fmt::print("Warning: {}\n", reader.Warning());
+  }
+
+  auto const &attributes{reader.GetAttrib()};
+  auto const &shapes{reader.GetShapes()};
+
+  vertices.clear();
+  indices.clear();
+
+  std::unordered_map<Vertex, GLuint> hash{};
+
+  for (auto const &shape : shapes) {
+    for (auto const offset : iter::range(shape.mesh.indices.size())) {
+      auto const index{shape.mesh.indices.at(offset)};
+
+      auto const startIndex{3 * index.vertex_index};
+      auto const vx{attributes.vertices.at(startIndex + 0)};
+      auto const vy{attributes.vertices.at(startIndex + 1)};
+      auto const vz{attributes.vertices.at(startIndex + 2)};
+
+      Vertex const vertex{.position = {vx, vy, vz}};
+
+      if (!hash.contains(vertex)) {
+        hash[vertex] = vertices.size();
+        vertices.push_back(vertex);
+      }
+
+      indices.push_back(hash[vertex]);
+    }
+  }
+
+  return std::make_tuple(vertices, indices);
 }
