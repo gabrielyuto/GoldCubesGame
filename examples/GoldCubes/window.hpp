@@ -3,16 +3,12 @@
 
 #include "abcgOpenGL.hpp"
 
+#include <glm/fwd.hpp>
 #include <random>
 
 #include "camera.hpp"
 #include "ground.hpp"
-
-struct Vertex {
-  glm::vec3 position;
-
-  friend bool operator==(Vertex const &, Vertex const &) = default;
-};
+#include "model.hpp"
 
 enum class RotationDirection { Right, Left, None };
 
@@ -25,28 +21,10 @@ protected:
   void onResize(glm::ivec2 const &size) override;
   void onDestroy() override;
   void onUpdate() override;
+  void handleColision();
 
 private:
-  struct Slenderman {
-    GLuint m_vao{};
-    GLuint m_vbo{};
-    GLuint m_ebo{};
-    std::vector<Vertex> m_vertices;
-    std::vector<GLuint> m_indices;
-  };
-
-  struct Box {
-    GLuint m_vao{};
-    GLuint m_vbo{};
-    GLuint m_ebo{};
-    std::vector<Vertex> m_vertices;
-    std::vector<GLuint> m_indices;
-  };
-
   glm::ivec2 m_viewportSize{};
-
-  Box m_box;
-  Slenderman m_slenderman;
 
   GLuint m_VAO{};
   GLuint m_VBO{};
@@ -74,10 +52,22 @@ private:
   float m_truckSpeed{};
   float m_panSpeed{};
 
+  std::vector<glm::vec3> cubes_pos;
+  bool colided = false;
+  // ver numero de cubos
+
   Ground m_ground;
 
-  std::tuple<std::vector<Vertex>, std::vector<GLuint>>
-  loadModelFromFile(std::string_view path);
+  Model m_model_box;
+  int m_trianglesToDraw_box{};
+
+  Model m_model_slenderman;
+  int m_trianglesToDraw_slenderman{};
+
+
+  glm::mat4 m_modelMatrix{1.0f};
+  glm::mat4 m_viewMatrix{1.0f};
+  glm::mat4 m_projMatrix{1.0f};
 
   void createCube();
 };

@@ -1,5 +1,6 @@
 #include "window.hpp"
 #include "abcgShader.hpp"
+#include "core.h"
 #include <glm/gtx/fast_trigonometry.hpp>
 #include <unordered_map>
 
@@ -14,99 +15,50 @@ void Window::onCreate() {
   auto const &assetsPath{abcg::Application::getAssetsPath()};
 
   abcg::glClearColor(0, 0, 0, 1);
-
   abcg::glEnable(GL_DEPTH_TEST);
 
-  m_program =
-      abcg::createOpenGLProgram({{.source = assetsPath + "lookat.vert",
+  m_program = abcg::createOpenGLProgram({{.source = assetsPath + "shaders/lookat.vert",
                                   .stage = abcg::ShaderStage::Vertex},
-                                 {.source = assetsPath + "lookat.frag",
+                                 {.source = assetsPath + "shaders/lookat.frag",
                                   .stage = abcg::ShaderStage::Fragment}});
 
+  // OBJ BOX
+  m_model_box.loadObj(assetsPath + "objmodels/box.obj");
+  m_model_box.setupVAO(m_program);
+  m_trianglesToDraw_box = m_model_box.getNumTriangles();
+
+  // OBJ SLENDERMAN
+  m_model_slenderman.loadObj(assetsPath + "objmodels/slenderman.obj");
+  m_model_slenderman.setupVAO(m_program);
+  m_trianglesToDraw_slenderman = m_model_slenderman.getNumTriangles();
+
   m_ground.create(m_program);
-
-  m_viewMatrixLocation = abcg::glGetUniformLocation(m_program, "viewMatrix");
-  m_projMatrixLocation = abcg::glGetUniformLocation(m_program, "projMatrix");
-  m_modelMatrixLocation = abcg::glGetUniformLocation(m_program, "modelMatrix");
-  m_colorLocation = abcg::glGetUniformLocation(m_program, "color"); 
-
-  // ---------------------------------CREATE OBJECT BOX------------------------------------------------
-  auto const [vertices_box, indices_box] = loadModelFromFile(assetsPath + "/objmodels/box.obj");
-
-  abcg::glGenBuffers(1, &m_VBO_box);
-  abcg::glBindBuffer(GL_ARRAY_BUFFER, m_VBO_box);
-  abcg::glBufferData(GL_ARRAY_BUFFER,sizeof(vertices_box.at(0)) * vertices_box.size(), vertices_box.data(), GL_STATIC_DRAW);
-  abcg::glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-  abcg::glGenBuffers(1, &m_EBO_box);
-  abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO_box);
-  abcg::glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices_box.at(0)) * indices_box.size(), indices_box.data(), GL_STATIC_DRAW);
-  abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-  abcg::glGenVertexArrays(1, &m_VAO_box);
-  abcg::glBindVertexArray(m_VAO_box);
-
-  abcg::glBindBuffer(GL_ARRAY_BUFFER, m_VBO_box);
-
-  auto const positionAttribute{
-    abcg::glGetAttribLocation(m_program, "inPosition")
-  };
-
-  abcg::glEnableVertexAttribArray(positionAttribute);
-  abcg::glVertexAttribPointer(positionAttribute, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
-  abcg::glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-  abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO_box);
-
-  abcg::glBindVertexArray(0);
-
-  m_box = Box { m_VAO_box, m_VBO_box, m_EBO_box, vertices_box, indices_box };
-
-  // ---------------------------------CREATE OBJECT SLENDERMAN ------------------------------------------------
-
-  auto const [vertices_slender, indices_slender] = loadModelFromFile(assetsPath + "/objmodels/slenderman.obj");
-
-  abcg::glGenBuffers(1, &m_VBO_slender);
-  abcg::glBindBuffer(GL_ARRAY_BUFFER, m_VBO_slender);
-  abcg::glBufferData(GL_ARRAY_BUFFER, sizeof(vertices_slender.at(0)) * vertices_slender.size(), vertices_slender.data(), GL_STATIC_DRAW);
-  abcg::glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-  abcg::glGenBuffers(1, &m_EBO_slender);
-  abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO_slender);
-  abcg::glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices_slender.at(0)) * indices_slender.size(), indices_slender.data(), GL_STATIC_DRAW);
-  abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-  abcg::glGenVertexArrays(1, &m_VAO_slender);
-
-  abcg::glBindVertexArray(m_VAO_slender);
-
-  abcg::glBindBuffer(GL_ARRAY_BUFFER, m_VBO_slender);
-
-  auto const positionAttribute_slenderman{
-    abcg::glGetAttribLocation(m_program, "inPosition")
-  };
-
-  abcg::glEnableVertexAttribArray(positionAttribute_slenderman);
-  abcg::glVertexAttribPointer(positionAttribute_slenderman, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
-  abcg::glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-  abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO_slender);
-
-  abcg::glBindVertexArray(0);
-
-  m_slenderman = Slenderman{ m_VAO_slender, m_VBO_slender, m_EBO_slender, vertices_slender, indices_slender };
 }
 
 void Window::onPaint() {
   abcg::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   abcg::glViewport(0, 0, m_viewportSize.x, m_viewportSize.y);
   abcg::glUseProgram(m_program);
-  abcg::glUniformMatrix4fv(m_viewMatrixLocation, 1, GL_FALSE, &m_camera.getViewMatrix()[0][0]);
-  abcg::glUniformMatrix4fv(m_projMatrixLocation, 1, GL_FALSE, &m_camera.getProjMatrix()[0][0]);
 
-  const int limit_sup{50};
-  const int limit_inf{-50};
-  
+  // Get location of uniform variables
+  auto const viewMatrixLoc{abcg::glGetUniformLocation(m_program, "viewMatrix")};
+  auto const projMatrixLoc{abcg::glGetUniformLocation(m_program, "projMatrix")};
+  auto const modelMatrixLoc{abcg::glGetUniformLocation(m_program, "modelMatrix")};
+  auto const colorLoc{abcg::glGetUniformLocation(m_program, "color")};
+
+ // Set uniform variables that have the same value for every model
+  abcg::glUniformMatrix4fv(viewMatrixLoc, 1, GL_FALSE, &m_viewMatrix[0][0]);
+  abcg::glUniformMatrix4fv(projMatrixLoc, 1, GL_FALSE, &m_projMatrix[0][0]);
+
+  abcg::glUniformMatrix4fv(viewMatrixLoc, 1, GL_FALSE, &m_camera.getViewMatrix()[0][0]);
+  abcg::glUniformMatrix4fv(projMatrixLoc, 1, GL_FALSE, &m_camera.getProjMatrix()[0][0]);
+
+  cubes_pos.clear();
+
+  // DRAW CUBS
+  const int limit_sup{10};
+  const int limit_inf{-10};
+
   for (int x = limit_inf; x < limit_sup; x++) {
     for (int z = limit_inf; z < limit_sup; z++) {
       glm::mat4 model_box{1.0f};
@@ -114,82 +66,12 @@ void Window::onPaint() {
       model_box = glm::rotate(model_box, glm::radians(10.0f), glm::vec3(0, 1, 0));
       model_box = glm::scale(model_box, glm::vec3(0.5f));
 
-      abcg::glBindVertexArray(m_box.m_vao);
-      abcg::glUniformMatrix4fv(m_modelMatrixLocation, 1, GL_FALSE, &model_box[0][0]);
-      abcg::glUniform4f(m_colorLocation, x, (x + z), z, 1.0f);
-      abcg::glDrawElements(GL_TRIANGLES, m_box.m_indices.size(), GL_UNSIGNED_INT, nullptr);                  
-    }
-  }
+      cubes_pos.push_back(glm::vec3(x, 0.5f, z));
 
-  for (int x = limit_inf; x < limit_sup; x++) {
-    for (int z = limit_inf; z < limit_sup; z++) {
-      glm::mat4 model{1.0f};
-      model = glm::translate(model, glm::vec3(x, 0.7f, z));
-      model = glm::rotate(model, glm::radians(40.0f), glm::vec3(0, 1, 0));
-      model = glm::scale(model, glm::vec3(0.5f));
-
-      abcg::glBindVertexArray(m_box.m_vao);
-      abcg::glUniformMatrix4fv(m_modelMatrixLocation, 1, GL_FALSE, &model[0][0]);
-      abcg::glUniform4f(m_colorLocation, 0, 0, 0, 1.0f);
-      abcg::glDrawElements(GL_TRIANGLES, m_box.m_indices.size(), GL_UNSIGNED_INT, nullptr);
-    }
-  }
-
-  for (int x = limit_inf; x < limit_sup; x++) {
-    for (int z = limit_inf; z < limit_sup; z++) {
-      glm::mat4 model{1.0f};
-      model = glm::translate(model, glm::vec3(x, 1.0f, z));
-      model = glm::rotate(model, glm::radians(70.0f), glm::vec3(0, 1, 0));
-      model = glm::scale(model, glm::vec3(0.5f));
-
-      abcg::glBindVertexArray(m_box.m_vao);
-      abcg::glUniformMatrix4fv(m_modelMatrixLocation, 1, GL_FALSE, &model[0][0]);
-      abcg::glUniform4f(m_colorLocation, x, (x + z), z, 1.0f);
-      abcg::glDrawElements(GL_TRIANGLES, m_box.m_indices.size(), GL_UNSIGNED_INT, nullptr);
-    }
-  }
-
-  for (int x = limit_inf; x < limit_sup; x++) {
-    for (int z = limit_inf; z < limit_sup; z++) {
-      glm::mat4 model{1.0f};
-      model = glm::translate(model, glm::vec3(x, 1.6f, z));
-      model = glm::rotate(model, glm::radians(80.0f), glm::vec3(0, 1, 0));
-      model = glm::scale(model, glm::vec3(0.5f));
-
-      abcg::glBindVertexArray(m_box.m_vao);
-      abcg::glUniformMatrix4fv(m_modelMatrixLocation, 1, GL_FALSE, &model[0][0]);
-      abcg::glUniform4f(m_colorLocation, 0, 0, 0, 1.0f);
-      abcg::glDrawElements(GL_TRIANGLES, m_box.m_indices.size(), GL_UNSIGNED_INT, nullptr);
-    }
-  }
-
-  for (int x = limit_inf; x < limit_sup; x++) {
-    for (int z = limit_inf; z < limit_sup; z++) {
-      glm::mat4 model{1.0f};
-      model = glm::translate(model, glm::vec3(x, 1.9f, z));
-      model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0, 1, 0));
-      model = glm::scale(model, glm::vec3(0.5f));
-
-      abcg::glBindVertexArray(m_box.m_vao);
-      abcg::glUniformMatrix4fv(m_modelMatrixLocation, 1, GL_FALSE, &model[0][0]);
-      abcg::glUniform4f(m_colorLocation, x, (x + z), z, 1.0f);
-      abcg::glDrawElements(GL_TRIANGLES, m_box.m_indices.size(), GL_UNSIGNED_INT, nullptr);
-    }
-  }
-
-  const int count_gold_cube{10};
-
-  for (int a = 0; a < count_gold_cube; a++) {
-    for(int b = 0; b  < count_gold_cube; b++){
-      glm::mat4 model{1.0f};
-      model = glm::translate(model, glm::vec3(a/2, 0.5f, b/2));
-      model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0, 1, 0));
-      model = glm::scale(model, glm::vec3(0.1f));
-
-      abcg::glBindVertexArray(m_box.m_vao);
-      abcg::glUniformMatrix4fv(m_modelMatrixLocation, 1, GL_FALSE, &model[0][0]);
-      abcg::glUniform4f(m_colorLocation, 255, 223, 0.0, 1.0f);
-      abcg::glDrawElements(GL_TRIANGLES, m_box.m_indices.size(), GL_UNSIGNED_INT, nullptr);
+      // Set uniform variables for the current model
+      abcg::glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &model_box[0][0]);
+      abcg::glUniform4f(colorLoc, x, (x + z), z, 1.0f);
+      m_model_box.render(m_trianglesToDraw_box);      
     }
   }
 
@@ -197,12 +79,12 @@ void Window::onPaint() {
   glm::mat4 model_slenderman{1.0f};
   model_slenderman = glm::translate(model_slenderman, glm::vec3(0, 0.5f, 2.3));
   model_slenderman = glm::rotate(model_slenderman, glm::radians(180.0f), glm::vec3(0, 1, 0));
-  model_slenderman = glm::scale(model_slenderman, glm::vec3(0.001f));
+  model_slenderman = glm::scale(model_slenderman, glm::vec3(0.5f));
 
-  abcg::glBindVertexArray(m_slenderman.m_vao);
-  abcg::glUniformMatrix4fv(m_modelMatrixLocation, 1, GL_FALSE, &model_slenderman[0][0]);
-  abcg::glUniform4f(m_colorLocation, 3.0, 1.0, 3.0, 1.0f);
-  abcg::glDrawElements(GL_TRIANGLES, m_slenderman.m_indices.size(), GL_UNSIGNED_INT, nullptr);         
+  // Set uniform variables for the current model
+  abcg::glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &model_slenderman[0][0]);
+  abcg::glUniform4f(colorLoc, 3.0, 1.0, 3.0, 1.0f);
+  m_model_slenderman.render(m_trianglesToDraw_slenderman);
 
   m_ground.paint();
 
@@ -233,12 +115,19 @@ void Window::onUpdate() {
   m_camera.dolly(m_dollySpeed * deltaTime);
   m_camera.truck(m_truckSpeed * deltaTime);
   m_camera.pan(m_panSpeed * deltaTime);
+
+  handleColision();
 }
 
 void Window::onEvent(SDL_Event const &event) {
   if (event.type == SDL_KEYDOWN) {
-    if (event.key.keysym.sym == SDLK_UP || event.key.keysym.sym == SDLK_w)
-      m_dollySpeed = 1.0f;
+    if (event.key.keysym.sym == SDLK_UP || event.key.keysym.sym == SDLK_w) {
+      if (colided == false) {
+        m_dollySpeed = 1.0f;
+      } else {
+        m_dollySpeed = 0.0f;
+      }
+    }
     if (event.key.keysym.sym == SDLK_DOWN || event.key.keysym.sym == SDLK_s)
       m_dollySpeed = -1.0f;
     if (event.key.keysym.sym == SDLK_LEFT || event.key.keysym.sym == SDLK_a)
@@ -252,8 +141,11 @@ void Window::onEvent(SDL_Event const &event) {
   }
   if (event.type == SDL_KEYUP) {
     if ((event.key.keysym.sym == SDLK_UP || event.key.keysym.sym == SDLK_w) &&
-        m_dollySpeed > 0)
-      m_dollySpeed = 0.0f;
+        m_dollySpeed > 0) {
+      if (colided == false) {
+        m_dollySpeed = 0.0f;
+      }
+    }
     if ((event.key.keysym.sym == SDLK_DOWN || event.key.keysym.sym == SDLK_s) &&
         m_dollySpeed < 0)
       m_dollySpeed = 0.0f;
@@ -271,51 +163,18 @@ void Window::onEvent(SDL_Event const &event) {
   }
 }
 
-std::tuple<std::vector<Vertex>, std::vector<GLuint>>
-Window::loadModelFromFile(std::string_view path) {
-  tinyobj::ObjReader reader;
-  std::vector<Vertex> vertices;
-  std::vector<GLuint> indices;
+void Window::handleColision() {
+  for (size_t i = 0; i < cubes_pos.size(); i++) {
+    float distance = glm::distance(cubes_pos[i], m_camera.getEye());
 
-  if (!reader.ParseFromFile(path.data())) {
-    if (!reader.Error().empty()) {
-      throw abcg::RuntimeError(
-          fmt::format("Failed to load model {} ({})", path, reader.Error()));
-    }
-    throw abcg::RuntimeError(fmt::format("Failed to load model {}", path));
-  }
-
-  if (!reader.Warning().empty()) {
-    fmt::print("Warning: {}\n", reader.Warning());
-  }
-
-  auto const &attributes{reader.GetAttrib()};
-  auto const &shapes{reader.GetShapes()};
-
-  vertices.clear();
-  indices.clear();
-
-  std::unordered_map<Vertex, GLuint> hash{};
-
-  for (auto const &shape : shapes) {
-    for (auto const offset : iter::range(shape.mesh.indices.size())) {
-      auto const index{shape.mesh.indices.at(offset)};
-
-      auto const startIndex{3 * index.vertex_index};
-      auto const vx{attributes.vertices.at(startIndex + 0)};
-      auto const vy{attributes.vertices.at(startIndex + 1)};
-      auto const vz{attributes.vertices.at(startIndex + 2)};
-
-      Vertex const vertex{.position = {vx, vy, vz}};
-
-      if (!hash.contains(vertex)) {
-        hash[vertex] = vertices.size();
-        vertices.push_back(vertex);
-      }
-
-      indices.push_back(hash[vertex]);
+    if (distance < 0.5) {
+      fmt::print("COLIDIU {}\n", distance);
+      colided = true;
+      return;
     }
   }
 
-  return std::make_tuple(vertices, indices);
+  colided = false;
+
+  fmt::print("QUANTOS CUBOS {}\n", cubes_pos.size());
 }

@@ -16,6 +16,9 @@ public:
   glm::mat4 const &getViewMatrix() const { return m_viewMatrix; }
   glm::mat4 const &getProjMatrix() const { return m_projMatrix; }
 
+  glm::vec3 const getAt() const { return m_at; }
+  glm::vec3 const getEye() const { return m_eye; }
+
 private:
   glm::vec3 m_eye{0.5f, 0.5f, 3.0f};
   glm::vec3 m_at{0.0f, 0.5f, 1.0f};
