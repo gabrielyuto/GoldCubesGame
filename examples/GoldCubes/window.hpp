@@ -2,74 +2,65 @@
 #define WINDOW_HPP_
 
 #include "abcgOpenGL.hpp"
-
-#include <glm/fwd.hpp>
-#include <random>
-
-#include "camera.hpp"
-#include "ground.hpp"
 #include "model.hpp"
-
-enum class RotationDirection { Right, Left, None };
+#include "camera.hpp"
+#include "maze.hpp"
 
 class Window : public abcg::OpenGLWindow {
-protected:
+ protected:
   void onEvent(SDL_Event const &event) override;
   void onCreate() override;
+  void onUpdate() override;
   void onPaint() override;
   void onPaintUI() override;
   void onResize(glm::ivec2 const &size) override;
   void onDestroy() override;
-  void onUpdate() override;
-  void handleColision();
 
-private:
+ private: 
+  GLuint m_skyProgram{};
+  std::vector<char const *> m_shaderNames{
+      "normalmapping", "skybox"
+  };
+
+  std::vector<GLuint> m_programs;
+
   glm::ivec2 m_viewportSize{};
 
-  GLuint m_VAO{};
-  GLuint m_VBO{};
-  GLuint m_EBO{};
-
-  GLuint m_VAO_box{};
-  GLuint m_VBO_box{};
-  GLuint m_EBO_box{};
-
-  GLuint m_VAO_slender{};
-  GLuint m_VBO_slender{};
-  GLuint m_EBO_slender{};
-
-  GLuint m_program{};
-
-  GLint m_viewMatrixLocation{};
-  GLint m_projMatrixLocation{};
-  GLint m_modelMatrixLocation{};
-  GLint m_colorLocation{};
-  GLint m_lightPosition{};
-  GLint m_shadowRadius{};
+  Model m_grassModel;
+  Model m_wallModel;
+  
+  Maze m_maze;
 
   Camera m_camera;
-  float m_dollySpeed{};
-  float m_truckSpeed{};
+  float m_dollySpeed{0.0f};
+  float m_truckSpeed{0.0f};
   float m_panSpeed{};
 
-  std::vector<glm::vec3> cubes_pos;
-  bool colided = false;
-  // ver numero de cubos
+  bool m_isFlashlightOn{true};
 
-  Ground m_ground;
+  // Mapping mode
+  // 0: triplanar; 1: cylindrical; 2: spherical; 3: from mesh
+  int m_mappingMode{};
 
-  Model m_model_box;
-  int m_trianglesToDraw_box{};
+  // Light properties
+  glm::vec4 m_Ia{5.0f};
+  glm::vec4 m_Id{1.0f};
+  glm::vec4 m_Is{1.0f};
+  float m_lightCutOff{0.98f};
+  float m_lightOuterCutOff{0.92f};
+  float m_lightOff{2.00f};
 
-  Model m_model_slenderman;
-  int m_trianglesToDraw_slenderman{};
+  // Material properties
+  glm::vec4 m_Ka;
+  glm::vec4 m_Kd;
+  glm::vec4 m_Ks;
+  float m_shininess{};
 
-
-  glm::mat4 m_modelMatrix{1.0f};
-  glm::mat4 m_viewMatrix{1.0f};
-  glm::mat4 m_projMatrix{1.0f};
-
-  void createCube();
+  void renderMaze();
+  void renderSkybox();
+  void update();
+  void initializeSound(std::string path);
+  glm::vec2 getRotationSpeedFromMouse();
 };
 
 #endif

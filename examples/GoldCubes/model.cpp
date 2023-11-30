@@ -1,109 +1,32 @@
 #include "model.hpp"
 
+#include <fmt/core.h>
+#include <tiny_obj_loader.h>
+
+#include <cppitertools/itertools.hpp>
 #include <filesystem>
+#include <glm/gtx/hash.hpp>
 #include <unordered_map>
 
-// Explicit specialization of std::hash for Vertex
-template <> struct std::hash<Vertex> {
-  size_t operator()(Vertex const &vertex) const noexcept {
-    auto const h1{std::hash<glm::vec3>()(vertex.position)};
-    auto const h2{std::hash<glm::vec3>()(vertex.normal)};
-    auto const h3{std::hash<glm::vec2>()(vertex.texCoord)};
-    return abcg::hashCombine(h1, h2, h3);
+// Custom specialization of std::hash injected in namespace std
+namespace std {
+template <>
+struct hash<Vertex> {
+  size_t operator()(Vertex const& vertex) const noexcept {
+    std::size_t h1{std::hash<glm::vec3>()(vertex.position)};
+    std::size_t h2{std::hash<glm::vec3>()(vertex.normal)};
+    std::size_t h3{std::hash<glm::vec2>()(vertex.texCoord)};
+    return h1 ^ h2 ^ h3;
   }
 };
+}  // namespace std
 
-void Model::computeNormals() {
-  // Clear previous vertex normals
-  for (auto &vertex : m_vertices) {
-    vertex.normal = glm::vec3(0.0f);
-  }
-
-  // Compute face normals
-  for (auto const offset : iter::range(0UL, m_indices.size(), 3UL)) {
-    // Get face vertices
-    auto &a{m_vertices.at(m_indices.at(offset + 0))};
-    auto &b{m_vertices.at(m_indices.at(offset + 1))};
-    auto &c{m_vertices.at(m_indices.at(offset + 2))};
-
-    // Compute normal
-    auto const edge1{b.position - a.position};
-    auto const edge2{c.position - b.position};
-    auto const normal{glm::cross(edge1, edge2)};
-
-    // Accumulate on vertices
-    a.normal += normal;
-    b.normal += normal;
-    c.normal += normal;
-  }
-
-  // Normalize
-  for (auto &vertex : m_vertices) {
-    vertex.normal = glm::normalize(vertex.normal);
-  }
-
-  m_hasNormals = true;
-}
-
-void Model::computeTangents() {
-  // Reserve space for bitangents
-  std::vector bitangents(m_vertices.size(), glm::vec3(0));
-
-  // Compute face tangents and bitangents
-  for (auto const offset : iter::range(0UL, m_indices.size(), 3UL)) {
-    // Get face indices
-    auto const i1{m_indices.at(offset + 0)};
-    auto const i2{m_indices.at(offset + 1)};
-    auto const i3{m_indices.at(offset + 2)};
-
-    // Get face vertices
-    auto &v1{m_vertices.at(i1)};
-    auto &v2{m_vertices.at(i2)};
-    auto &v3{m_vertices.at(i3)};
-
-    auto const e1{v2.position - v1.position};
-    auto const e2{v3.position - v1.position};
-    auto const delta1{v2.texCoord - v1.texCoord};
-    auto const delta2{v3.texCoord - v1.texCoord};
-
-    glm::mat2 M;
-    M[0][0] = delta2.t;
-    M[0][1] = -delta1.t;
-    M[1][0] = -delta2.s;
-    M[1][1] = delta1.s;
-    M *= (1.0f / (delta1.s * delta2.t - delta2.s * delta1.t));
-
-    auto const tangent{glm::vec4(M[0][0] * e1.x + M[0][1] * e2.x,
-                                 M[0][0] * e1.y + M[0][1] * e2.y,
-                                 M[0][0] * e1.z + M[0][1] * e2.z, 0.0f)};
-
-    auto const bitangent{glm::vec3(M[1][0] * e1.x + M[1][1] * e2.x,
-                                   M[1][0] * e1.y + M[1][1] * e2.y,
-                                   M[1][0] * e1.z + M[1][1] * e2.z)};
-
-    // Accumulate on vertices
-    v1.tangent += tangent;
-    v2.tangent += tangent;
-    v3.tangent += tangent;
-
-    bitangents.at(i1) += bitangent;
-    bitangents.at(i2) += bitangent;
-    bitangents.at(i3) += bitangent;
-  }
-
-  for (auto &&[i, vertex] : iter::enumerate(m_vertices)) {
-    auto const &n{vertex.normal};
-    auto const &t{glm::vec3(vertex.tangent)};
-
-    // Orthogonalize t with respect to n
-    auto const tangent{t - n * glm::dot(n, t)};
-    vertex.tangent = glm::vec4(glm::normalize(tangent), 0);
-
-    // Compute handedness of re-orthogonalized basis
-    auto const b{glm::cross(n, t)};
-    auto const handedness{glm::dot(b, bitangents.at(i))};
-    vertex.tangent.w = (handedness < 0.0f) ? -1.0f : 1.0f;
-  }
+Model::~Model() {
+  abcg::glDeleteTextures(1, &m_normalTexture);
+  abcg::glDeleteTextures(1, &m_diffuseTexture);
+  abcg::glDeleteBuffers(1, &m_EBO);
+  abcg::glDeleteBuffers(1, &m_VBO);
+  abcg::glDeleteVertexArrays(1, &m_VAO);
 }
 
 void Model::createBuffers() {
@@ -114,31 +37,35 @@ void Model::createBuffers() {
   // VBO
   abcg::glGenBuffers(1, &m_VBO);
   abcg::glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
-  abcg::glBufferData(GL_ARRAY_BUFFER,
-                     sizeof(m_vertices.at(0)) * m_vertices.size(),
-                     m_vertices.data(), GL_STATIC_DRAW);
+  abcg::glBufferData(GL_ARRAY_BUFFER, sizeof(m_vertices[0]) * m_vertices.size(), m_vertices.data(), GL_STATIC_DRAW);
   abcg::glBindBuffer(GL_ARRAY_BUFFER, 0);
 
   // EBO
   abcg::glGenBuffers(1, &m_EBO);
   abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
-  abcg::glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                     sizeof(m_indices.at(0)) * m_indices.size(),
-                     m_indices.data(), GL_STATIC_DRAW);
+  abcg::glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(m_indices[0]) * m_indices.size(),
+               m_indices.data(), GL_STATIC_DRAW);
   abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
+void Model::loadCubeTexture(const std::string& path) {
+  if (!std::filesystem::exists(path)) return;
+
+  abcg::glDeleteTextures(1, &m_cubeTexture);
+  m_cubeTexture = abcg::loadOpenGLCubemap(
+      {.paths = {path + "posx.png", path + "negx.png", path + "posy.png",
+                 path + "negy.png", path + "posz.png", path + "negz.png"}});
+}
+
 void Model::loadDiffuseTexture(std::string_view path) {
-  if (!std::filesystem::exists(path))
-    return;
+  if (!std::filesystem::exists(path)) return;
 
   abcg::glDeleteTextures(1, &m_diffuseTexture);
   m_diffuseTexture = abcg::loadOpenGLTexture({.path = path});
 }
 
 void Model::loadNormalTexture(std::string_view path) {
-  if (!std::filesystem::exists(path))
-    return;
+  if (!std::filesystem::exists(path)) return;
 
   abcg::glDeleteTextures(1, &m_normalTexture);
   m_normalTexture = abcg::loadOpenGLTexture({.path = path});
@@ -263,7 +190,7 @@ void Model::loadObj(std::string_view path, bool standardize) {
   createBuffers();
 }
 
-void Model::render(int numTriangles) const {
+void Model::render() const {
   abcg::glBindVertexArray(m_VAO);
 
   abcg::glActiveTexture(GL_TEXTURE0);
@@ -271,6 +198,9 @@ void Model::render(int numTriangles) const {
 
   abcg::glActiveTexture(GL_TEXTURE1);
   abcg::glBindTexture(GL_TEXTURE_2D, m_normalTexture);
+
+  abcg::glActiveTexture(GL_TEXTURE2);
+  abcg::glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubeTexture);
 
   // Set minification and magnification parameters
   abcg::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -280,10 +210,10 @@ void Model::render(int numTriangles) const {
   abcg::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
   abcg::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
-  auto const numIndices{(numTriangles < 0) ? m_indices.size()
-                                           : numTriangles * 3};
-
-  abcg::glDrawElements(GL_TRIANGLES, numIndices, GL_UNSIGNED_INT, nullptr);
+  abcg::glFrontFace(GL_CCW);
+  abcg::glDepthFunc(GL_LEQUAL);
+  
+  abcg::glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, nullptr);
 
   abcg::glBindVertexArray(0);
 }
@@ -301,41 +231,35 @@ void Model::setupVAO(GLuint program) {
   abcg::glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
 
   // Bind vertex attributes
-  auto const positionAttribute{
-      abcg::glGetAttribLocation(program, "inPosition")};
+  GLint positionAttribute = abcg::glGetAttribLocation(program, "inPosition");
   if (positionAttribute >= 0) {
     abcg::glEnableVertexAttribArray(positionAttribute);
     abcg::glVertexAttribPointer(positionAttribute, 3, GL_FLOAT, GL_FALSE,
-                                sizeof(Vertex), nullptr);
+                          sizeof(Vertex), nullptr);
   }
 
-  auto const normalAttribute{abcg::glGetAttribLocation(program, "inNormal")};
+  GLint normalAttribute = abcg::glGetAttribLocation(program, "inNormal");
   if (normalAttribute >= 0) {
     abcg::glEnableVertexAttribArray(normalAttribute);
-    auto const offset{offsetof(Vertex, normal)};
+    GLsizei offset{sizeof(glm::vec3)};
     abcg::glVertexAttribPointer(normalAttribute, 3, GL_FLOAT, GL_FALSE,
-                                sizeof(Vertex),
-                                reinterpret_cast<void *>(offset));
+                          sizeof(Vertex), reinterpret_cast<void*>(offset));
   }
 
-  auto const texCoordAttribute{
-      abcg::glGetAttribLocation(program, "inTexCoord")};
+  GLint texCoordAttribute{glGetAttribLocation(program, "inTexCoord")};
   if (texCoordAttribute >= 0) {
     abcg::glEnableVertexAttribArray(texCoordAttribute);
-    auto const offset{offsetof(Vertex, texCoord)};
+    GLsizei offset{sizeof(glm::vec3) + sizeof(glm::vec3)};
     abcg::glVertexAttribPointer(texCoordAttribute, 2, GL_FLOAT, GL_FALSE,
-                                sizeof(Vertex),
-                                reinterpret_cast<void *>(offset));
+                          sizeof(Vertex), reinterpret_cast<void*>(offset));
   }
-
-  auto const tangentCoordAttribute{
-      abcg::glGetAttribLocation(program, "inTangent")};
+  
+  GLint tangentCoordAttribute{glGetAttribLocation(program, "inTangent")};
   if (tangentCoordAttribute >= 0) {
     abcg::glEnableVertexAttribArray(tangentCoordAttribute);
-    auto const offset{offsetof(Vertex, tangent)};
+    GLsizei offset{sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec2)};
     abcg::glVertexAttribPointer(tangentCoordAttribute, 4, GL_FLOAT, GL_FALSE,
-                                sizeof(Vertex),
-                                reinterpret_cast<void *>(offset));
+                          sizeof(Vertex), reinterpret_cast<void*>(offset));
   }
 
   // End of binding
@@ -349,23 +273,114 @@ void Model::standardize() {
   // Get bounds
   glm::vec3 max(std::numeric_limits<float>::lowest());
   glm::vec3 min(std::numeric_limits<float>::max());
-  for (auto const &vertex : m_vertices) {
-    max = glm::max(max, vertex.position);
-    min = glm::min(min, vertex.position);
+  for (const auto& vertex : m_vertices) {
+    max.x = std::max(max.x, vertex.position.x);
+    max.y = std::max(max.y, vertex.position.y);
+    max.z = std::max(max.z, vertex.position.z);
+    min.x = std::min(min.x, vertex.position.x);
+    min.y = std::min(min.y, vertex.position.y);
+    min.z = std::min(min.z, vertex.position.z);
   }
 
   // Center and scale
-  auto const center{(min + max) / 2.0f};
-  auto const scaling{2.0f / glm::length(max - min)};
-  for (auto &vertex : m_vertices) {
+  const auto center{(min + max) / 2.0f};
+  const auto scaling{2.0f / glm::length(max - min)};
+  for (auto& vertex : m_vertices) {
     vertex.position = (vertex.position - center) * scaling;
   }
 }
 
-void Model::destroy() {
-  abcg::glDeleteTextures(1, &m_normalTexture);
-  abcg::glDeleteTextures(1, &m_diffuseTexture);
-  abcg::glDeleteBuffers(1, &m_EBO);
-  abcg::glDeleteBuffers(1, &m_VBO);
-  abcg::glDeleteVertexArrays(1, &m_VAO);
+void Model::computeNormals() {
+  // Clear previous vertex normals
+  for (auto& vertex : m_vertices) {
+    vertex.normal = glm::zero<glm::vec3>();
+  }
+
+  // Compute face normals
+  for (const auto offset : iter::range<int>(0, m_indices.size(), 3)) {
+    // Get face vertices
+    Vertex& a{m_vertices.at(m_indices.at(offset + 0))};
+    Vertex& b{m_vertices.at(m_indices.at(offset + 1))};
+    Vertex& c{m_vertices.at(m_indices.at(offset + 2))};
+
+    // Compute normal
+    const auto edge1{b.position - a.position};
+    const auto edge2{c.position - b.position};
+    glm::vec3 normal{glm::cross(edge1, edge2)};
+
+    // Accumulate on vertices
+    a.normal += normal;
+    b.normal += normal;
+    c.normal += normal;
+  }
+
+  // Normalize
+  for (auto& vertex : m_vertices) {
+    vertex.normal = glm::normalize(vertex.normal);
+  }
+
+  m_hasNormals = true;
+}
+
+void Model::computeTangents() {
+  // Reserve space for bitangents
+  std::vector<glm::vec3> bitangents(m_vertices.size(), glm::vec3(0));
+
+  // Compute face tangents and bitangents
+  for (const auto offset : iter::range<int>(0, m_indices.size(), 3)) {
+    // Get face indices
+    const auto i1{m_indices.at(offset + 0)};
+    const auto i2{m_indices.at(offset + 1)};
+    const auto i3{m_indices.at(offset + 2)};
+
+    // Get face vertices
+    Vertex& v1{m_vertices.at(i1)};
+    Vertex& v2{m_vertices.at(i2)};
+    Vertex& v3{m_vertices.at(i3)};
+
+    const auto e1{v2.position - v1.position};
+    const auto e2{v3.position - v1.position};
+    const auto delta1{v2.texCoord - v1.texCoord};
+    const auto delta2{v3.texCoord - v1.texCoord};
+
+    // clang-format off
+    glm::mat2 M;
+    M[0][0] =  delta2.t;
+    M[0][1] = -delta1.t;
+    M[1][0] = -delta2.s;
+    M[1][1] =  delta1.s;
+    M *= (1.0f / (delta1.s * delta2.t - delta2.s * delta1.t));
+
+    auto tangent{glm::vec4(M[0][0] * e1.x + M[0][1] * e2.x,
+                           M[0][0] * e1.y + M[0][1] * e2.y,
+                           M[0][0] * e1.z + M[0][1] * e2.z, 0.0f)};
+
+    auto bitangent{glm::vec3(M[1][0] * e1.x + M[1][1] * e2.x,
+                             M[1][0] * e1.y + M[1][1] * e2.y,
+                             M[1][0] * e1.z + M[1][1] * e2.z)};
+    // clang-format on
+
+    // Accumulate on vertices
+    v1.tangent += tangent;
+    v2.tangent += tangent;
+    v3.tangent += tangent;
+
+    bitangents.at(i1) += bitangent;
+    bitangents.at(i2) += bitangent;
+    bitangents.at(i3) += bitangent;
+  }
+
+  for (auto&& [i, vertex] : iter::enumerate(m_vertices)) {
+    const auto& n{vertex.normal};
+    const auto& t{glm::vec3(vertex.tangent)};
+
+    // Orthogonalize t with respect to n
+    const auto tangent = t - n * glm::dot(n, t);
+    vertex.tangent = glm::vec4(glm::normalize(tangent), 0);
+
+    // Compute handedness of re-orthogonalized basis
+    const auto b{glm::cross(n, t)};
+    const auto handedness{glm::dot(b, bitangents.at(i))};
+    vertex.tangent.w = (handedness < 0.0f) ? -1.0f : 1.0f;
+  }
 }

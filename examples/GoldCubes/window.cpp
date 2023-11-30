@@ -1,133 +1,15 @@
 #include "window.hpp"
-#include "abcgShader.hpp"
-#include "core.h"
-#include <glm/gtx/fast_trigonometry.hpp>
-#include <unordered_map>
 
-template <> struct std::hash<Vertex> {
-  size_t operator()(Vertex const &vertex) const noexcept {
-    auto const h1{std::hash<glm::vec3>()(vertex.position)};
-    return h1;
-  }
-};
+#include <imgui.h>
+#include <fmt/core.h>
 
-void Window::onCreate() {
-  auto const &assetsPath{abcg::Application::getAssetsPath()};
-
-  abcg::glClearColor(0, 0, 0, 1);
-  abcg::glEnable(GL_DEPTH_TEST);
-
-  m_program = abcg::createOpenGLProgram({{.source = assetsPath + "shaders/lookat.vert",
-                                  .stage = abcg::ShaderStage::Vertex},
-                                 {.source = assetsPath + "shaders/lookat.frag",
-                                  .stage = abcg::ShaderStage::Fragment}});
-
-  // OBJ BOX
-  m_model_box.loadObj(assetsPath + "objmodels/box.obj");
-  m_model_box.setupVAO(m_program);
-  m_trianglesToDraw_box = m_model_box.getNumTriangles();
-
-  // OBJ SLENDERMAN
-  m_model_slenderman.loadObj(assetsPath + "objmodels/slenderman.obj");
-  m_model_slenderman.setupVAO(m_program);
-  m_trianglesToDraw_slenderman = m_model_slenderman.getNumTriangles();
-
-  m_ground.create(m_program);
-}
-
-void Window::onPaint() {
-  abcg::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  abcg::glViewport(0, 0, m_viewportSize.x, m_viewportSize.y);
-  abcg::glUseProgram(m_program);
-
-  // Get location of uniform variables
-  auto const viewMatrixLoc{abcg::glGetUniformLocation(m_program, "viewMatrix")};
-  auto const projMatrixLoc{abcg::glGetUniformLocation(m_program, "projMatrix")};
-  auto const modelMatrixLoc{abcg::glGetUniformLocation(m_program, "modelMatrix")};
-  auto const colorLoc{abcg::glGetUniformLocation(m_program, "color")};
-
- // Set uniform variables that have the same value for every model
-  abcg::glUniformMatrix4fv(viewMatrixLoc, 1, GL_FALSE, &m_viewMatrix[0][0]);
-  abcg::glUniformMatrix4fv(projMatrixLoc, 1, GL_FALSE, &m_projMatrix[0][0]);
-
-  abcg::glUniformMatrix4fv(viewMatrixLoc, 1, GL_FALSE, &m_camera.getViewMatrix()[0][0]);
-  abcg::glUniformMatrix4fv(projMatrixLoc, 1, GL_FALSE, &m_camera.getProjMatrix()[0][0]);
-
-  cubes_pos.clear();
-
-  // DRAW CUBS
-  const int limit_sup{10};
-  const int limit_inf{-10};
-
-  for (int x = limit_inf; x < limit_sup; x++) {
-    for (int z = limit_inf; z < limit_sup; z++) {
-      glm::mat4 model_box{1.0f};
-      model_box = glm::translate(model_box, glm::vec3(x, 0.5f, z));
-      model_box = glm::rotate(model_box, glm::radians(10.0f), glm::vec3(0, 1, 0));
-      model_box = glm::scale(model_box, glm::vec3(0.5f));
-
-      cubes_pos.push_back(glm::vec3(x, 0.5f, z));
-
-      // Set uniform variables for the current model
-      abcg::glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &model_box[0][0]);
-      abcg::glUniform4f(colorLoc, x, (x + z), z, 1.0f);
-      m_model_box.render(m_trianglesToDraw_box);      
-    }
-  }
-
-  // DRAW SLENDERMAN
-  glm::mat4 model_slenderman{1.0f};
-  model_slenderman = glm::translate(model_slenderman, glm::vec3(0, 0.5f, 2.3));
-  model_slenderman = glm::rotate(model_slenderman, glm::radians(180.0f), glm::vec3(0, 1, 0));
-  model_slenderman = glm::scale(model_slenderman, glm::vec3(0.5f));
-
-  // Set uniform variables for the current model
-  abcg::glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &model_slenderman[0][0]);
-  abcg::glUniform4f(colorLoc, 3.0, 1.0, 3.0, 1.0f);
-  m_model_slenderman.render(m_trianglesToDraw_slenderman);
-
-  m_ground.paint();
-
-  abcg::glUseProgram(0);
-}
-
-void Window::onPaintUI() { 
-  abcg::OpenGLWindow::onPaintUI(); 
-}
-
-void Window::onResize(glm::ivec2 const &size) {
-  m_viewportSize = size;
-  m_camera.computeProjectionMatrix(size);
-}
-
-void Window::onDestroy() {
-  m_ground.destroy();
-
-  abcg::glDeleteProgram(m_program);
-  abcg::glDeleteBuffers(1, &m_EBO);
-  abcg::glDeleteBuffers(1, &m_VBO);
-  abcg::glDeleteVertexArrays(1, &m_VAO);
-}
-
-void Window::onUpdate() {
-  auto const deltaTime{gsl::narrow_cast<float>(getDeltaTime())};
-
-  m_camera.dolly(m_dollySpeed * deltaTime);
-  m_camera.truck(m_truckSpeed * deltaTime);
-  m_camera.pan(m_panSpeed * deltaTime);
-
-  handleColision();
-}
+#include <cppitertools/itertools.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
 
 void Window::onEvent(SDL_Event const &event) {
   if (event.type == SDL_KEYDOWN) {
-    if (event.key.keysym.sym == SDLK_UP || event.key.keysym.sym == SDLK_w) {
-      if (colided == false) {
-        m_dollySpeed = 1.0f;
-      } else {
-        m_dollySpeed = 0.0f;
-      }
-    }
+    if (event.key.keysym.sym == SDLK_UP || event.key.keysym.sym == SDLK_w)
+      m_dollySpeed = 1.0f;
     if (event.key.keysym.sym == SDLK_DOWN || event.key.keysym.sym == SDLK_s)
       m_dollySpeed = -1.0f;
     if (event.key.keysym.sym == SDLK_LEFT || event.key.keysym.sym == SDLK_a)
@@ -141,11 +23,8 @@ void Window::onEvent(SDL_Event const &event) {
   }
   if (event.type == SDL_KEYUP) {
     if ((event.key.keysym.sym == SDLK_UP || event.key.keysym.sym == SDLK_w) &&
-        m_dollySpeed > 0) {
-      if (colided == false) {
-        m_dollySpeed = 0.0f;
-      }
-    }
+        m_dollySpeed > 0)
+      m_dollySpeed = 0.0f;
     if ((event.key.keysym.sym == SDLK_DOWN || event.key.keysym.sym == SDLK_s) &&
         m_dollySpeed < 0)
       m_dollySpeed = 0.0f;
@@ -163,18 +42,144 @@ void Window::onEvent(SDL_Event const &event) {
   }
 }
 
-void Window::handleColision() {
-  for (size_t i = 0; i < cubes_pos.size(); i++) {
-    float distance = glm::distance(cubes_pos[i], m_camera.getEye());
+void Window::onCreate() {
+  auto const assetsPath{abcg::Application::getAssetsPath()};
 
-    if (distance < 0.5) {
-      fmt::print("COLIDIU {}\n", distance);
-      colided = true;
-      return;
-    }
+  abcg::glClearColor(0, 0, 0, 1);
+  abcg::glEnable(GL_DEPTH_TEST);
+
+  for (auto const &name : m_shaderNames) {
+    auto const path{assetsPath + "shaders/" + name};
+    auto const program{abcg::createOpenGLProgram(
+        {{.source = path + ".vert", .stage = abcg::ShaderStage::Vertex},
+         {.source = path + ".frag", .stage = abcg::ShaderStage::Fragment}})};
+    m_programs.push_back(program);
   }
 
-  colided = false;
+  // Load models
+  m_grassModel.loadObj(assetsPath + "models/grass.obj", false);
+  m_grassModel.setupVAO(m_programs.at(0));
 
-  fmt::print("QUANTOS CUBOS {}\n", cubes_pos.size());
+  m_wallModel.loadObj(assetsPath + "models/wall.obj", false);
+  m_wallModel.setupVAO(m_programs.at(0));
+
+  // Use material properties from the loaded model (they are the same)
+  m_Ka = m_wallModel.getKa();
+  m_Kd = m_wallModel.getKd();
+  m_Ks = m_wallModel.getKs();
+  m_shininess = m_wallModel.getShininess();
+  m_mappingMode = 3;
+
+  m_maze.initializeMaze(assetsPath + "levels/level1.txt");
+  m_camera.initializeCamera(m_maze);
+}
+
+void Window::onPaint() {
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  glViewport(0, 0, m_viewportSize.x, m_viewportSize.y);
+
+  renderMaze();
+}
+
+void Window::onPaintUI() {
+  auto const assetsPath{abcg::Application::getAssetsPath()};
+
+  ImGui::SetNextWindowPos(ImVec2{0, 0});
+  ImGui::SetNextWindowSize(ImVec2{(float)m_viewportSize.x, (float)m_viewportSize.y});
+}
+
+void Window::onResize(glm::ivec2 const &size) {
+  m_viewportSize = size;
+  m_camera.computeProjectionMatrix(size);
+}
+
+void Window::onDestroy() { 
+  for (auto const &program : m_programs) {
+    abcg::glDeleteProgram(program);
+  }
+}
+
+void Window::renderMaze() {
+  abcg::glUseProgram(m_programs.at(0));
+
+  // Get location of uniform variables (could be precomputed)
+  GLint modelMatrixLoc{glGetUniformLocation(m_programs.at(0), "modelMatrix")};
+  GLint viewMatrixLoc{glGetUniformLocation(m_programs.at(0), "viewMatrix")};
+  GLint projMatrixLoc{glGetUniformLocation(m_programs.at(0), "projMatrix")};
+  GLint normalMatrixLoc{glGetUniformLocation(m_programs.at(0), "normalMatrix")};
+  
+  GLint lightDirLoc{glGetUniformLocation(m_programs.at(0), "lightDirWorldSpace")};
+  GLint lightPosLoc{glGetUniformLocation(m_programs.at(0), "lightPosWorldSpace")};
+  GLint lightCutOffLoc{glGetUniformLocation(m_programs.at(0), "lightCutOff")};
+  GLint lightOuterCutOffLoc{glGetUniformLocation(m_programs.at(0), "lightOuterCutOff")};
+
+  GLint IaLoc{glGetUniformLocation(m_programs.at(0), "Ia")};
+  GLint IdLoc{glGetUniformLocation(m_programs.at(0), "Id")};
+  GLint IsLoc{glGetUniformLocation(m_programs.at(0), "Is")};
+  GLint KaLoc{glGetUniformLocation(m_programs.at(0), "Ka")};
+  GLint KdLoc{glGetUniformLocation(m_programs.at(0), "Kd")};
+  GLint KsLoc{glGetUniformLocation(m_programs.at(0), "Ks")};
+  GLint shininessLoc{glGetUniformLocation(m_programs.at(0), "shininess")};
+
+  GLint diffuseTexLoc{glGetUniformLocation(m_programs.at(0), "diffuseTex")};
+  GLint normalTexLoc{glGetUniformLocation(m_programs.at(0), "normalTex")};
+  GLint mappingModeLoc{glGetUniformLocation(m_programs.at(0), "mappingMode")};
+
+  // Set uniform variables that will be used for every scene object
+  glUniformMatrix4fv(viewMatrixLoc, 1, GL_FALSE, &m_camera.m_viewMatrix[0][0]);
+  glUniformMatrix4fv(projMatrixLoc, 1, GL_FALSE, &m_camera.m_projMatrix[0][0]);
+  glUniform1i(diffuseTexLoc, 0);
+  glUniform1i(normalTexLoc, 1);
+  glUniform1i(mappingModeLoc, m_mappingMode);
+
+  glm::vec4 lightDir(m_camera.m_at - m_camera.m_eye, 0.0f);
+  glm::vec4 lightPos(m_camera.m_eye, 1.0f);
+  glUniform4fv(lightDirLoc, 1, &lightDir.x);
+  glUniform4fv(lightPosLoc, 1, &lightPos.x);
+  glUniform1f(lightCutOffLoc, m_isFlashlightOn ? m_lightCutOff : m_lightOff);
+  glUniform1f(lightOuterCutOffLoc, m_isFlashlightOn ? m_lightOuterCutOff : m_lightOff);
+
+  glUniform4fv(IaLoc, 1, &m_Ia.x);
+  glUniform4fv(IdLoc, 1, &m_Id.x);
+  glUniform4fv(IsLoc, 1, &m_Is.x);
+  glUniform4fv(KaLoc, 1, &m_Ka.x);
+  glUniform4fv(KdLoc, 1, &m_Kd.x);
+  glUniform4fv(KsLoc, 1, &m_Ks.x);
+  glUniform1f(shininessLoc, m_shininess);
+
+  // Draw all wall boxes by setting uniform variables of the current object
+  for (size_t i = 0; i < m_maze.m_mazeMatrix.size(); i++) {
+    for (size_t j = 0; j < m_maze.m_mazeMatrix[i].size(); j++) {
+      float xPos =  static_cast<float>(i);
+      float yPos =  static_cast<float>(j);
+
+      glm::mat4 modelMatrix{1.0f};
+      modelMatrix = glm::translate(modelMatrix, glm::vec3(xPos, 0.0f, yPos));
+      glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &modelMatrix[0][0]);
+
+      auto modelViewMatrix{glm::mat3(m_camera.m_viewMatrix * modelMatrix)};
+      glm::mat3 normalMatrix{glm::inverseTranspose(modelViewMatrix)};
+      glUniformMatrix3fv(normalMatrixLoc, 1, GL_FALSE, &normalMatrix[0][0]);
+        
+      if (m_maze.isBox(i, j)) {
+        m_wallModel.render();
+      }
+      else {
+        m_grassModel.render();
+      }
+    }
+  }
+  glUseProgram(0);
+}
+
+void Window::onUpdate() {
+  auto const deltaTime{gsl::narrow_cast<float>(getDeltaTime())};
+
+  m_camera.dolly(m_dollySpeed * deltaTime);
+  m_camera.truck(m_truckSpeed * deltaTime);
+  m_camera.pan(m_panSpeed * deltaTime);
+
+  // if (m_maze.hasFinished(m_camera.m_eye)) {
+  //   m_gameOver = true;
+  // }
 }
