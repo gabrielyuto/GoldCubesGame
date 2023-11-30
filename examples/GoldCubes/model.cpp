@@ -48,15 +48,6 @@ void Model::createBuffers() {
   abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
-void Model::loadCubeTexture(const std::string& path) {
-  if (!std::filesystem::exists(path)) return;
-
-  abcg::glDeleteTextures(1, &m_cubeTexture);
-  m_cubeTexture = abcg::loadOpenGLCubemap(
-      {.paths = {path + "posx.png", path + "negx.png", path + "posy.png",
-                 path + "negy.png", path + "posz.png", path + "negz.png"}});
-}
-
 void Model::loadDiffuseTexture(std::string_view path) {
   if (!std::filesystem::exists(path)) return;
 

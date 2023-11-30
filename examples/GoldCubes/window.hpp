@@ -18,7 +18,7 @@ class Window : public abcg::OpenGLWindow {
 
  private: 
   GLuint m_skyProgram{};
-  std::vector<char const *> m_shaderNames{
+  std::vector<char const*> m_shaderNames{
       "normalmapping", "skybox"
   };
 

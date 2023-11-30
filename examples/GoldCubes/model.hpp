@@ -27,7 +27,6 @@ class Model {
   Model& operator=(const Model&) = delete;
   Model& operator=(Model&&) = default;
 
-  void loadCubeTexture(const std::string& path);
   void loadDiffuseTexture(std::string_view path);
   void loadNormalTexture(std::string_view path);
   void loadObj(std::string_view path, bool standardize = true);
