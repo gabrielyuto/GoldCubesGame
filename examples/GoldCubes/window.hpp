@@ -18,7 +18,7 @@ class Window : public abcg::OpenGLWindow {
 
  private: 
   GLuint m_skyProgram{};
-  std::vector<char const*> m_shaderNames{
+  std::vector<char const *> m_shaderNames{
       "normalmapping", "skybox"
   };
 
@@ -28,6 +28,7 @@ class Window : public abcg::OpenGLWindow {
 
   Model m_grassModel;
   Model m_wallModel;
+  Model m_box;
   
   Maze m_maze;
 
@@ -43,7 +44,7 @@ class Window : public abcg::OpenGLWindow {
   int m_mappingMode{};
 
   // Light properties
-  glm::vec4 m_Ia{5.0f};
+  glm::vec4 m_Ia{10.0f};
   glm::vec4 m_Id{1.0f};
   glm::vec4 m_Is{1.0f};
   float m_lightCutOff{0.98f};
@@ -57,10 +58,7 @@ class Window : public abcg::OpenGLWindow {
   float m_shininess{};
 
   void renderMaze();
-  void renderSkybox();
-  void update();
-  void initializeSound(std::string path);
-  glm::vec2 getRotationSpeedFromMouse();
+  void renderBox();
 };
 
 #endif

@@ -57,11 +57,14 @@ void Window::onCreate() {
   }
 
   // Load models
-  m_grassModel.loadObj(assetsPath + "models/grass.obj", false);
+  m_grassModel.loadObj(assetsPath + "models/ground.obj", false);
   m_grassModel.setupVAO(m_programs.at(0));
 
   m_wallModel.loadObj(assetsPath + "models/wall.obj", false);
   m_wallModel.setupVAO(m_programs.at(0));
+
+  m_box.loadObj(assetsPath + "models/box.obj", false);
+  m_box.setupVAO(m_programs.at(0));
 
   // Use material properties from the loaded model (they are the same)
   m_Ka = m_wallModel.getKa();
@@ -70,7 +73,7 @@ void Window::onCreate() {
   m_shininess = m_wallModel.getShininess();
   m_mappingMode = 3;
 
-  m_maze.initializeMaze(assetsPath + "levels/level1.txt");
+  m_maze.initializeMaze(assetsPath + "levels/map.txt");
   m_camera.initializeCamera(m_maze);
 }
 
@@ -79,6 +82,7 @@ void Window::onPaint() {
   glViewport(0, 0, m_viewportSize.x, m_viewportSize.y);
 
   renderMaze();
+  renderBox();
 }
 
 void Window::onPaintUI() {
@@ -93,6 +97,14 @@ void Window::onResize(glm::ivec2 const &size) {
   m_camera.computeProjectionMatrix(size);
 }
 
+void Window::onUpdate() {
+  auto const deltaTime{gsl::narrow_cast<float>(getDeltaTime())};
+
+  m_camera.dolly(m_dollySpeed * deltaTime);
+  m_camera.truck(m_truckSpeed * deltaTime);
+  m_camera.pan(m_panSpeed * deltaTime);
+}
+
 void Window::onDestroy() { 
   for (auto const &program : m_programs) {
     abcg::glDeleteProgram(program);
@@ -102,11 +114,83 @@ void Window::onDestroy() {
 void Window::renderMaze() {
   abcg::glUseProgram(m_programs.at(0));
 
+  GLint modelMatrixLoc{glGetUniformLocation(m_programs.at(0), "modelMatrix")};
+  GLint viewMatrixLoc{glGetUniformLocation(m_programs.at(0), "viewMatrix")};
+  GLint projMatrixLoc{glGetUniformLocation(m_programs.at(0), "projMatrix")};
+  GLint normalMatrixLoc{glGetUniformLocation(m_programs.at(0), "normalMatrix")};
+  
+  GLint lightDirLoc{glGetUniformLocation(m_programs.at(0), "lightDirWorldSpace")};
+  GLint lightPosLoc{glGetUniformLocation(m_programs.at(0), "lightPosWorldSpace")};
+  GLint lightCutOffLoc{glGetUniformLocation(m_programs.at(0), "lightCutOff")};
+  GLint lightOuterCutOffLoc{glGetUniformLocation(m_programs.at(0), "lightOuterCutOff")};
+
+  GLint IaLoc{glGetUniformLocation(m_programs.at(0), "Ia")};
+  GLint IdLoc{glGetUniformLocation(m_programs.at(0), "Id")};
+  GLint IsLoc{glGetUniformLocation(m_programs.at(0), "Is")};
+  GLint KaLoc{glGetUniformLocation(m_programs.at(0), "Ka")};
+  GLint KdLoc{glGetUniformLocation(m_programs.at(0), "Kd")};
+  GLint KsLoc{glGetUniformLocation(m_programs.at(0), "Ks")};
+  GLint shininessLoc{glGetUniformLocation(m_programs.at(0), "shininess")};
+
+  GLint diffuseTexLoc{glGetUniformLocation(m_programs.at(0), "diffuseTex")};
+  GLint normalTexLoc{glGetUniformLocation(m_programs.at(0), "normalTex")};
+  GLint mappingModeLoc{glGetUniformLocation(m_programs.at(0), "mappingMode")};
+
+  glUniformMatrix4fv(viewMatrixLoc, 1, GL_FALSE, &m_camera.m_viewMatrix[0][0]);
+  glUniformMatrix4fv(projMatrixLoc, 1, GL_FALSE, &m_camera.m_projMatrix[0][0]);
+  glUniform1i(diffuseTexLoc, 0);
+  glUniform1i(normalTexLoc, 1);
+  glUniform1i(mappingModeLoc, m_mappingMode);
+
+  glm::vec4 lightDir(m_camera.m_at - m_camera.m_eye, 0.0f);
+  glm::vec4 lightPos(m_camera.m_eye, 1.0f);
+  glUniform4fv(lightDirLoc, 1, &lightDir.x);
+  glUniform4fv(lightPosLoc, 1, &lightPos.x);
+  glUniform1f(lightCutOffLoc, m_isFlashlightOn ? m_lightCutOff : m_lightOff);
+  glUniform1f(lightOuterCutOffLoc, m_isFlashlightOn ? m_lightOuterCutOff : m_lightOff);
+
+  glUniform4fv(IaLoc, 1, &m_Ia.x);
+  glUniform4fv(IdLoc, 1, &m_Id.x);
+  glUniform4fv(IsLoc, 1, &m_Is.x);
+  glUniform4fv(KaLoc, 1, &m_Ka.x);
+  glUniform4fv(KdLoc, 1, &m_Kd.x);
+  glUniform4fv(KsLoc, 1, &m_Ks.x);
+  glUniform1f(shininessLoc, m_shininess);
+
+  for (size_t i = 0; i < m_maze.m_mazeMatrix.size(); i++) {
+    for (size_t j = 0; j < m_maze.m_mazeMatrix[i].size(); j++) {
+      float xPos =  static_cast<float>(i);
+      float yPos =  static_cast<float>(j);
+
+      glm::mat4 modelMatrix{1.0f};
+      modelMatrix = glm::translate(modelMatrix, glm::vec3(xPos, 0.0f, yPos));
+      glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &modelMatrix[0][0]);
+
+      auto modelViewMatrix{glm::mat3(m_camera.m_viewMatrix * modelMatrix)};
+      glm::mat3 normalMatrix{glm::inverseTranspose(modelViewMatrix)};
+      glUniformMatrix3fv(normalMatrixLoc, 1, GL_FALSE, &normalMatrix[0][0]);
+        
+      if (m_maze.isBox(i, j)) {
+        m_wallModel.render();
+      }
+      else {
+        m_grassModel.render();
+      }
+    }
+  }
+
+  glUseProgram(0);
+}
+
+void Window::renderBox() {
+  abcg::glUseProgram(m_programs.at(0));
+
   // Get location of uniform variables (could be precomputed)
   GLint modelMatrixLoc{glGetUniformLocation(m_programs.at(0), "modelMatrix")};
   GLint viewMatrixLoc{glGetUniformLocation(m_programs.at(0), "viewMatrix")};
   GLint projMatrixLoc{glGetUniformLocation(m_programs.at(0), "projMatrix")};
   GLint normalMatrixLoc{glGetUniformLocation(m_programs.at(0), "normalMatrix")};
+  // GLint m_colorLocation{abcg::glGetUniformLocation(m_programs.at(0), "color")};
   
   GLint lightDirLoc{glGetUniformLocation(m_programs.at(0), "lightDirWorldSpace")};
   GLint lightPosLoc{glGetUniformLocation(m_programs.at(0), "lightPosWorldSpace")};
@@ -147,39 +231,32 @@ void Window::renderMaze() {
   glUniform4fv(KsLoc, 1, &m_Ks.x);
   glUniform1f(shininessLoc, m_shininess);
 
-  // Draw all wall boxes by setting uniform variables of the current object
-  for (size_t i = 0; i < m_maze.m_mazeMatrix.size(); i++) {
-    for (size_t j = 0; j < m_maze.m_mazeMatrix[i].size(); j++) {
-      float xPos =  static_cast<float>(i);
-      float yPos =  static_cast<float>(j);
+  glm::mat4 modelMatrix{1.0f};
+  modelMatrix = glm::translate(modelMatrix, glm::vec3(0.0f, 0.025f, 0.0f));
+  modelMatrix = glm::scale(modelMatrix, glm::vec3(0.1f));
+  glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &modelMatrix[0][0]);
 
-      glm::mat4 modelMatrix{1.0f};
-      modelMatrix = glm::translate(modelMatrix, glm::vec3(xPos, 0.0f, yPos));
-      glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &modelMatrix[0][0]);
+  auto modelViewMatrix{glm::mat3(m_camera.m_viewMatrix * modelMatrix)};
+  glm::mat3 normalMatrix{glm::inverseTranspose(modelViewMatrix)};
+  glUniformMatrix3fv(normalMatrixLoc, 1, GL_FALSE, &normalMatrix[0][0]);
 
-      auto modelViewMatrix{glm::mat3(m_camera.m_viewMatrix * modelMatrix)};
-      glm::mat3 normalMatrix{glm::inverseTranspose(modelViewMatrix)};
-      glUniformMatrix3fv(normalMatrixLoc, 1, GL_FALSE, &normalMatrix[0][0]);
-        
-      if (m_maze.isBox(i, j)) {
-        m_wallModel.render();
-      }
-      else {
-        m_grassModel.render();
-      }
-    }
-  }
+  // abcg::glBindVertexArray(m_box.getm_VAO());
+
+  // glm::mat4 modelBox{1.0f};
+  // modelBox = glm::translate(modelBox, glm::vec3(0.0f, 0.025f, 0.0f));
+  // // modelBox = glm::rotate(modelBox, glm::radians(10.0f), glm::vec3(0, 1, 0));
+  // modelBox = glm::scale(modelBox, glm::vec3(0.1f));
+
+  // abcg::glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &modelBox[0][0]);
+  // abcg::glUniform4f(m_colorLocation, 255, 223, 0.0, 1.0f);
+  // abcg::glDrawElements(GL_TRIANGLES, m_box.getIndices().size(), GL_UNSIGNED_INT, nullptr);      
+
+  // auto modelViewMatrix{glm::mat3(m_camera.m_viewMatrix * modelBox)};
+  // glm::mat3 normalMatrix{glm::inverseTranspose(modelViewMatrix)};
+  // glUniformMatrix3fv(normalMatrixLoc, 1, GL_FALSE, &normalMatrix[0][0]);
+  // glDrawElements(GL_TRIANGLES, m_box.getIndices().size(), GL_UNSIGNED_INT, nullptr);                  
+
+  m_box.render();
+    
   glUseProgram(0);
-}
-
-void Window::onUpdate() {
-  auto const deltaTime{gsl::narrow_cast<float>(getDeltaTime())};
-
-  m_camera.dolly(m_dollySpeed * deltaTime);
-  m_camera.truck(m_truckSpeed * deltaTime);
-  m_camera.pan(m_panSpeed * deltaTime);
-
-  // if (m_maze.hasFinished(m_camera.m_eye)) {
-  //   m_gameOver = true;
-  // }
 }

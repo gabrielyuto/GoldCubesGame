@@ -3,6 +3,4 @@ newmtl wall
 	Ka 0.1000 0.1000 0.1000
 	Kd 0.7000 0.7000 0.7000
 	Ks 0.1000 0.1000 0.1000
-  map_Kd ../maps/brick_base.jpg
-	map_bump ../maps/brick_normal.jpg
-	bump ../maps/brick_normal.jpg
+  map_Kd ../maps/neon_base.jpg

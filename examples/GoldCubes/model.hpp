@@ -38,6 +38,9 @@ class Model {
   [[nodiscard]] glm::vec4 getKs() const { return m_Ks; }
   [[nodiscard]] float getShininess() const { return m_shininess; }
 
+  [[nodiscard]] std::vector<GLuint> getIndices() const { return m_indices; }
+  [[nodiscard]] GLuint getm_VAO() const { return m_VAO; }
+
  private:
   GLuint m_VAO{};
   GLuint m_VBO{};

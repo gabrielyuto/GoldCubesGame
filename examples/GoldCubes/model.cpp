@@ -8,7 +8,6 @@
 #include <glm/gtx/hash.hpp>
 #include <unordered_map>
 
-// Custom specialization of std::hash injected in namespace std
 namespace std {
 template <>
 struct hash<Vertex> {
@@ -19,7 +18,7 @@ struct hash<Vertex> {
     return h1 ^ h2 ^ h3;
   }
 };
-}  // namespace std
+}
 
 Model::~Model() {
   abcg::glDeleteTextures(1, &m_normalTexture);
@@ -27,39 +26,6 @@ Model::~Model() {
   abcg::glDeleteBuffers(1, &m_EBO);
   abcg::glDeleteBuffers(1, &m_VBO);
   abcg::glDeleteVertexArrays(1, &m_VAO);
-}
-
-void Model::createBuffers() {
-  // Delete previous buffers
-  abcg::glDeleteBuffers(1, &m_EBO);
-  abcg::glDeleteBuffers(1, &m_VBO);
-
-  // VBO
-  abcg::glGenBuffers(1, &m_VBO);
-  abcg::glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
-  abcg::glBufferData(GL_ARRAY_BUFFER, sizeof(m_vertices[0]) * m_vertices.size(), m_vertices.data(), GL_STATIC_DRAW);
-  abcg::glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-  // EBO
-  abcg::glGenBuffers(1, &m_EBO);
-  abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
-  abcg::glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(m_indices[0]) * m_indices.size(),
-               m_indices.data(), GL_STATIC_DRAW);
-  abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-}
-
-void Model::loadDiffuseTexture(std::string_view path) {
-  if (!std::filesystem::exists(path)) return;
-
-  abcg::glDeleteTextures(1, &m_diffuseTexture);
-  m_diffuseTexture = abcg::loadOpenGLTexture({.path = path});
-}
-
-void Model::loadNormalTexture(std::string_view path) {
-  if (!std::filesystem::exists(path)) return;
-
-  abcg::glDeleteTextures(1, &m_normalTexture);
-  m_normalTexture = abcg::loadOpenGLTexture({.path = path});
 }
 
 void Model::loadObj(std::string_view path, bool standardize) {
@@ -181,81 +147,33 @@ void Model::loadObj(std::string_view path, bool standardize) {
   createBuffers();
 }
 
-void Model::render() const {
-  abcg::glBindVertexArray(m_VAO);
+void Model::loadDiffuseTexture(std::string_view path) {
+  if (!std::filesystem::exists(path)) return;
 
-  abcg::glActiveTexture(GL_TEXTURE0);
-  abcg::glBindTexture(GL_TEXTURE_2D, m_diffuseTexture);
-
-  abcg::glActiveTexture(GL_TEXTURE1);
-  abcg::glBindTexture(GL_TEXTURE_2D, m_normalTexture);
-
-  abcg::glActiveTexture(GL_TEXTURE2);
-  abcg::glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubeTexture);
-
-  // Set minification and magnification parameters
-  abcg::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  abcg::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-  // Set texture wrapping parameters
-  abcg::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-  abcg::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-  abcg::glFrontFace(GL_CCW);
-  abcg::glDepthFunc(GL_LEQUAL);
-  
-  abcg::glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, nullptr);
-
-  abcg::glBindVertexArray(0);
+  abcg::glDeleteTextures(1, &m_diffuseTexture);
+  m_diffuseTexture = abcg::loadOpenGLTexture({.path = path});
 }
 
-void Model::setupVAO(GLuint program) {
-  // Release previous VAO
-  abcg::glDeleteVertexArrays(1, &m_VAO);
+void Model::loadNormalTexture(std::string_view path) {
+  if (!std::filesystem::exists(path)) return;
 
-  // Create VAO
-  abcg::glGenVertexArrays(1, &m_VAO);
-  abcg::glBindVertexArray(m_VAO);
+  abcg::glDeleteTextures(1, &m_normalTexture);
+  m_normalTexture = abcg::loadOpenGLTexture({.path = path});
+}
 
-  // Bind EBO and VBO
-  abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
+void Model::createBuffers() {
+  abcg::glDeleteBuffers(1, &m_EBO);
+  abcg::glDeleteBuffers(1, &m_VBO);
+
+  abcg::glGenBuffers(1, &m_VBO);
   abcg::glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
-
-  // Bind vertex attributes
-  GLint positionAttribute = abcg::glGetAttribLocation(program, "inPosition");
-  if (positionAttribute >= 0) {
-    abcg::glEnableVertexAttribArray(positionAttribute);
-    abcg::glVertexAttribPointer(positionAttribute, 3, GL_FLOAT, GL_FALSE,
-                          sizeof(Vertex), nullptr);
-  }
-
-  GLint normalAttribute = abcg::glGetAttribLocation(program, "inNormal");
-  if (normalAttribute >= 0) {
-    abcg::glEnableVertexAttribArray(normalAttribute);
-    GLsizei offset{sizeof(glm::vec3)};
-    abcg::glVertexAttribPointer(normalAttribute, 3, GL_FLOAT, GL_FALSE,
-                          sizeof(Vertex), reinterpret_cast<void*>(offset));
-  }
-
-  GLint texCoordAttribute{glGetAttribLocation(program, "inTexCoord")};
-  if (texCoordAttribute >= 0) {
-    abcg::glEnableVertexAttribArray(texCoordAttribute);
-    GLsizei offset{sizeof(glm::vec3) + sizeof(glm::vec3)};
-    abcg::glVertexAttribPointer(texCoordAttribute, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(Vertex), reinterpret_cast<void*>(offset));
-  }
-  
-  GLint tangentCoordAttribute{glGetAttribLocation(program, "inTangent")};
-  if (tangentCoordAttribute >= 0) {
-    abcg::glEnableVertexAttribArray(tangentCoordAttribute);
-    GLsizei offset{sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec2)};
-    abcg::glVertexAttribPointer(tangentCoordAttribute, 4, GL_FLOAT, GL_FALSE,
-                          sizeof(Vertex), reinterpret_cast<void*>(offset));
-  }
-
-  // End of binding
+  abcg::glBufferData(GL_ARRAY_BUFFER, sizeof(m_vertices[0]) * m_vertices.size(), m_vertices.data(), GL_STATIC_DRAW);
   abcg::glBindBuffer(GL_ARRAY_BUFFER, 0);
-  abcg::glBindVertexArray(0);
+
+  abcg::glGenBuffers(1, &m_EBO);
+  abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
+  abcg::glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(m_indices[0]) * m_indices.size(),m_indices.data(), GL_STATIC_DRAW);
+  abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
 void Model::standardize() {
@@ -374,4 +292,81 @@ void Model::computeTangents() {
     const auto handedness{glm::dot(b, bitangents.at(i))};
     vertex.tangent.w = (handedness < 0.0f) ? -1.0f : 1.0f;
   }
+}
+
+void Model::render() const {
+  abcg::glBindVertexArray(m_VAO);
+
+  abcg::glActiveTexture(GL_TEXTURE0);
+  abcg::glBindTexture(GL_TEXTURE_2D, m_diffuseTexture);
+
+  abcg::glActiveTexture(GL_TEXTURE1);
+  abcg::glBindTexture(GL_TEXTURE_2D, m_normalTexture);
+
+  abcg::glActiveTexture(GL_TEXTURE2);
+  abcg::glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubeTexture);
+
+  // Set minification and magnification parameters
+  abcg::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  abcg::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+  // Set texture wrapping parameters
+  abcg::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  abcg::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+  abcg::glFrontFace(GL_CCW);
+  abcg::glDepthFunc(GL_LEQUAL);
+  
+  abcg::glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, nullptr);
+
+  abcg::glBindVertexArray(0);
+}
+
+void Model::setupVAO(GLuint program) {
+  // Release previous VAO
+  abcg::glDeleteVertexArrays(1, &m_VAO);
+
+  // Create VAO
+  abcg::glGenVertexArrays(1, &m_VAO);
+  abcg::glBindVertexArray(m_VAO);
+
+  // Bind EBO and VBO
+  abcg::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
+  abcg::glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
+
+  // Bind vertex attributes
+  GLint positionAttribute = abcg::glGetAttribLocation(program, "inPosition");
+  if (positionAttribute >= 0) {
+    abcg::glEnableVertexAttribArray(positionAttribute);
+    abcg::glVertexAttribPointer(positionAttribute, 3, GL_FLOAT, GL_FALSE,
+                          sizeof(Vertex), nullptr);
+  }
+
+  GLint normalAttribute = abcg::glGetAttribLocation(program, "inNormal");
+  if (normalAttribute >= 0) {
+    abcg::glEnableVertexAttribArray(normalAttribute);
+    GLsizei offset{sizeof(glm::vec3)};
+    abcg::glVertexAttribPointer(normalAttribute, 3, GL_FLOAT, GL_FALSE,
+                          sizeof(Vertex), reinterpret_cast<void*>(offset));
+  }
+
+  GLint texCoordAttribute{glGetAttribLocation(program, "inTexCoord")};
+  if (texCoordAttribute >= 0) {
+    abcg::glEnableVertexAttribArray(texCoordAttribute);
+    GLsizei offset{sizeof(glm::vec3) + sizeof(glm::vec3)};
+    abcg::glVertexAttribPointer(texCoordAttribute, 2, GL_FLOAT, GL_FALSE,
+                          sizeof(Vertex), reinterpret_cast<void*>(offset));
+  }
+  
+  GLint tangentCoordAttribute{glGetAttribLocation(program, "inTangent")};
+  if (tangentCoordAttribute >= 0) {
+    abcg::glEnableVertexAttribArray(tangentCoordAttribute);
+    GLsizei offset{sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec2)};
+    abcg::glVertexAttribPointer(tangentCoordAttribute, 4, GL_FLOAT, GL_FALSE,
+                          sizeof(Vertex), reinterpret_cast<void*>(offset));
+  }
+
+  // End of binding
+  abcg::glBindBuffer(GL_ARRAY_BUFFER, 0);
+  abcg::glBindVertexArray(0);
 }

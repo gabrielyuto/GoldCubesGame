@@ -1,0 +1,8 @@
+newmtl ground
+	Ns 25.0000
+	Ka 0.1000 0.1000 0.1000
+	Kd 0.7000 0.7000 0.7000
+	Ks 0.1000 0.1000 0.1000
+  map_Kd ../maps/ground_base.jpg
+	map_bump ../maps/ground_normal.jpg
+	bump ../maps/ground_normal.jpg
