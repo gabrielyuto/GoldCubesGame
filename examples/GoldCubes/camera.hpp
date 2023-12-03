@@ -19,6 +19,8 @@ class Camera {
   void pan(float speed);
   void tilt(float speed);
 
+  glm::vec3 getm_eye() const { return m_eye; }
+
  private:
   friend Window;
 

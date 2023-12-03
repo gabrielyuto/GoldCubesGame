@@ -2,12 +2,13 @@
 #define WINDOW_HPP_
 
 #include "abcgOpenGL.hpp"
-#include "model.hpp"
 #include "camera.hpp"
 #include "maze.hpp"
+#include "model.hpp"
+#include <glm/fwd.hpp>
 
 class Window : public abcg::OpenGLWindow {
- protected:
+protected:
   void onEvent(SDL_Event const &event) override;
   void onCreate() override;
   void onUpdate() override;
@@ -16,20 +17,26 @@ class Window : public abcg::OpenGLWindow {
   void onResize(glm::ivec2 const &size) override;
   void onDestroy() override;
 
- private: 
+private:
+  bool won{false};
+  ImFont *m_font{};
+
   GLuint m_skyProgram{};
-  std::vector<char const *> m_shaderNames{
-      "normalmapping", "skybox"
-  };
+  std::vector<char const *> m_shaderNames{"normalmapping", "skybox"};
+
+  glm::vec3 cube_pos{0.0f, 0.025f, 0.0f};
+  glm::vec3 trophy_pos{0.0f, 0.025f, 0.0f};
+
 
   std::vector<GLuint> m_programs;
 
   glm::ivec2 m_viewportSize{};
 
-  Model m_grassModel;
+  Model m_groundModel;
   Model m_wallModel;
   Model m_box;
-  
+  Model m_trophy;
+
   Maze m_maze;
 
   Camera m_camera;
@@ -59,6 +66,7 @@ class Window : public abcg::OpenGLWindow {
 
   void renderMaze();
   void renderBox();
+  void renderTrophy();
 };
 
 #endif
