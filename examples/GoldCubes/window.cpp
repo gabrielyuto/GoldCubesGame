@@ -277,7 +277,6 @@ void Window::renderBox() {
   float distance = glm::distance2(m_camera.getm_eye(), cube_pos);
   if (distance < 0.05f) {
     won = true;
-    fmt::print("WON!!\n");
   }
 }
 
