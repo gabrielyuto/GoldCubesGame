@@ -1,4 +1,6 @@
-#version 410
+#version 330
+
+precision mediump float;
 
 in vec2 fragTexCoord;
 
@@ -6,21 +8,13 @@ in vec3 fragPObj;
 in vec3 fragTObj;
 in vec3 fragBObj;
 in vec3 fragNObj;
-
 in vec3 fragLEye;
 in vec3 fragVEye;
-
-in vec4 fragPosition;
-
 
 uniform mat3 normalMatrix;
 
 // Light properties
 uniform vec4 Ia, Id, Is;
-uniform vec4 lightPosWorldSpace;
-uniform vec4 lightDirWorldSpace;
-uniform float lightCutOff;
-uniform float lightOuterCutOff;
 
 // Material properties
 uniform vec4 Ka, Kd, Ks;
@@ -43,12 +37,13 @@ mat3 ComputeTBN(vec3 TObj, vec3 BObj, vec3 NObj) {
   vec3 TEye = normalMatrix * normalize(TObj);
   vec3 BEye = normalMatrix * normalize(BObj);
   vec3 NEye = normalMatrix * normalize(NObj);
-  return mat3(TEye.x, BEye.x, NEye.x, TEye.y, BEye.y, NEye.y, TEye.z, BEye.z,
-              NEye.z);
+  return mat3(TEye.x, BEye.x, NEye.x,
+              TEye.y, BEye.y, NEye.y,
+              TEye.z, BEye.z, NEye.z);
 }
 
 // Blinn-Phong reflection model
-vec4 BlinnPhong(vec3 N, vec3 L, vec3 V, vec2 texCoord, float intensity, float attenuation) {
+vec4 BlinnPhong(vec3 N, vec3 L, vec3 V, vec2 texCoord) {
   N = normalize(N);
   L = normalize(L);
 
@@ -67,9 +62,9 @@ vec4 BlinnPhong(vec3 N, vec3 L, vec3 V, vec2 texCoord, float intensity, float at
   vec4 map_Kd = texture(diffuseTex, texCoord);
   vec4 map_Ka = map_Kd;
 
-  vec4 diffuseColor = map_Kd * Kd * Id * lambertian * intensity * attenuation;
-  vec4 specularColor = Ks * Is * specular * intensity * attenuation;
-  vec4 ambientColor = map_Ka * Ka * Ia * attenuation;
+  vec4 diffuseColor = map_Kd * Kd * Id * lambertian;
+  vec4 specularColor = Ks * Is * specular;
+  vec4 ambientColor = map_Ka * Ka * Ia;
 
   return ambientColor + diffuseColor + specularColor;
 }
@@ -140,19 +135,10 @@ mat3 SphericalTBN(vec3 P) {
 void main() {
   vec4 color;
 
-  // Spotlight (soft edges)
-  float theta     = dot(normalize(lightDirWorldSpace), normalize(fragPosition - lightPosWorldSpace));
-  float epsilon   = lightCutOff - lightOuterCutOff;
-  float intensity = clamp((theta - lightOuterCutOff) / epsilon, 0.0, 1.0); 
-
-  // Attenuation
-  float distance    = length(fragPosition - lightPosWorldSpace);
-  float attenuation = 1.0f / (1.0f + 0.09f * distance + 0.032 * (distance * distance));
-
   if (mappingMode == 0) {
     // Triplanar mapping
 
-    // A offset to center the texture around the origin
+    // An offset to center the texture around the origin
     vec3 offset = vec3(-0.5, -0.5, -0.5);
 
     // Sample with x planar mapping
@@ -162,7 +148,7 @@ void main() {
     vec3 VTan = TBN * normalize(fragVEye);
     vec3 NTan = texture(normalTex, texCoord1).xyz;
     NTan = normalize(NTan * 2.0 - 1.0);  // From [0, 1] to [-1, 1]
-    vec4 color1 = BlinnPhong(NTan, LTan, VTan, texCoord1, intensity, attenuation);
+    vec4 color1 = BlinnPhong(NTan, LTan, VTan, texCoord1);
 
     // Sample with y planar mapping
     vec2 texCoord2 = PlanarMappingYUV(fragPObj + offset);
@@ -171,7 +157,7 @@ void main() {
     VTan = TBN * normalize(fragVEye);
     NTan = texture(normalTex, texCoord2).xyz;
     NTan = normalize(NTan * 2.0 - 1.0);  // From [0, 1] to [-1, 1]
-    vec4 color2 = BlinnPhong(NTan, LTan, VTan, texCoord2, intensity, attenuation);
+    vec4 color2 = BlinnPhong(NTan, LTan, VTan, texCoord2);
 
     // Sample with z planar mapping
     vec2 texCoord3 = PlanarMappingZUV(fragPObj + offset);
@@ -180,7 +166,7 @@ void main() {
     VTan = TBN * normalize(fragVEye);
     NTan = texture(normalTex, texCoord3).xyz;
     NTan = normalize(NTan * 2.0 - 1.0);  // From [0, 1] to [-1, 1]
-    vec4 color3 = BlinnPhong(NTan, LTan, VTan, texCoord3, intensity, attenuation);
+    vec4 color3 = BlinnPhong(NTan, LTan, VTan, texCoord3);
 
     // Compute average based on normal
     vec3 weight = abs(normalize(fragNObj));
@@ -208,8 +194,13 @@ void main() {
     vec3 NTan = texture(normalTex, texCoord).xyz;
     NTan = normalize(NTan * 2.0 - 1.0);  // From [0, 1] to [-1, 1]
 
-    color = BlinnPhong(NTan, LTan, VTan, texCoord, intensity, attenuation);
+    color = BlinnPhong(NTan, LTan, VTan, texCoord);
   }
 
-  outColor = color;
+  if (gl_FrontFacing) {
+    outColor = color;
+  } else {
+    float i = (color.r + color.g + color.b) / 3.0;
+    outColor = vec4(i, 0, 0, 1);
+  }
 }

@@ -21,8 +21,7 @@ private:
   bool won{false};
   ImFont *m_font{};
 
-  GLuint m_skyProgram{};
-  std::vector<char const *> m_shaderNames{"normalmapping", "skybox"};
+  std::vector<char const *> m_shaderNames{"normalmapping"};
 
   glm::vec3 cube_pos{0.0f, 0.025f, 0.0f};
   glm::vec3 trophy_pos{0.0f, 0.025f, 0.0f};
