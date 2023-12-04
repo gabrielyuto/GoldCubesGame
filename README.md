@@ -19,11 +19,11 @@ O objetivo desta aplicação é criar um cenário de um labirinto em cubos, de m
 
 <div align="center">
 
-![Aplicação](./images/image3.jpeg)
+![Aplicação](./images/image3.png)
 
 </div>
 
-A aplicação teve como base o projeto LookAt apresentado durante as aulas de laboratório. Dessa forma, foi construído um cenário em que é gerado um "solo" com base na classe ground.cpp e ground.hpp, e também é construído a classe camera.cpp e camera.hpp para se obter uma visão do espaço da camera a partir do espaço do mundo.
+A aplicação teve como base o projeto LookAt apresentado durante as aulas de laboratório. Dessa forma, foi construído um cenário em que é gerado um "solo" com base na classe ground.cpp e ground.hpp, e também é construído a classe camera.cpp e camera.hpp para se obter uma visão do espaço da camera a partir do espaço do mundo. Agpra também com a aplicação de texturas no chão e métodos de aplicação de texturas, sobras e luzes durante as aulas ministradas da disciplina
 
 ### Implementação
 Para a implementação, primeiro foi feita uma modificação dos valores de core RGB do solo, atribuindo a cor da seguinte forma:
