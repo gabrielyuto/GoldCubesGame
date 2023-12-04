@@ -2,6 +2,7 @@
 ## Atividade 3 - Aplicação interativa com gráficos 3D, iluminação e texturização
 
 Link WebAssembly: 
+Link para o vídeo do Youtube: https://www.youtube.com/watch?v=kAWeEBukILc
 
 ### Integrantes:
 Nomes:
