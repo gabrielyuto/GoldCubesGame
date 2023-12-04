@@ -93,39 +93,36 @@ Explicações das funções por arquivo do repositório:
 
 1. camera.cpp e camera.hpp
 
-Estes arquivos geralmente contêm a implementação e declaração de uma classe de câmera, que é usada para controlar a visão do jogador no jogo. Funções comuns incluem:
+Estes arquivos contêm a implementação e declaração de uma classe de câmera, que é usada para controlar a visão do jogador no jogo. Funções comuns incluem:
 
     Inicialização da câmera.
     Ajuste da posição e orientação da câmera.
     Métodos para manipular a visualização, como zoom, rotação e translação.
 
-2. CMakeLists.txt
-
-Este arquivo não contém funções de programação, mas sim instruções para o CMake, uma ferramenta de build. Ele especifica como o projeto deve ser construído, incluindo definições de alvos de compilação, dependências e configurações de compilação.
-3. main.cpp
+2. main.cpp
 
 Este é o ponto de entrada do programa. Normalmente, contém:
 
     A função main, que inicializa o jogo e inicia o loop principal.
     Configurações iniciais do jogo, como criação de janelas e inicialização de subsistemas.
 
-4. maze.cpp e maze.hpp
+3. maze.cpp e maze.hpp
 
-Estes arquivos são provavelmente responsáveis pela lógica e representação do labirinto no jogo. Eles podem conter:
+Estes arquivos são responsáveis pela lógica e representação do labirinto no jogo.
 
     Funções para gerar o layout do labirinto.
     Métodos para desenhar o labirinto na tela.
     Lógica para detectar colisões ou interações dentro do labirinto.
 
-5. model.cpp e model.hpp
+4. model.cpp e model.hpp
 
-Esses arquivos devem lidar com a representação de modelos 3D no jogo. Funções comuns incluem:
+Esses arquivos lidam com a representação de modelos 3D no jogo. Funções comuns incluem:
 
     Carregamento de modelos a partir de arquivos.
     Renderização de modelos na tela.
     Manipulação de propriedades dos modelos, como posição, escala e rotação.
 
-6. window.cpp e window.hpp
+5. window.cpp e window.hpp
 
 Estes arquivos são responsáveis pela criação e gerenciamento da janela do jogo. Eles podem incluir:
 
@@ -135,9 +132,7 @@ Estes arquivos são responsáveis pela criação e gerenciamento da janela do jo
 
 Vou verificar o conteúdo específico de cada arquivo para fornecer detalhes mais precisos. ​
 
-​
-
-Aqui está um resumo das funções contidas nos arquivos do projeto GoldCubesGame:
+​GoldCubesGame:
 camera.cpp
 
     initializeCamera(Maze maze): Inicializa a câmera com o labirinto.
@@ -147,14 +142,6 @@ camera.cpp
     truck(float speed): Move a câmera para esquerda/direita.
     pan(float speed): Rotaciona a câmera.
 
-camera.hpp
-
-    Não foram encontradas funções específicas neste arquivo.
-
-CMakeLists.txt
-
-    Este arquivo não contém funções de programação.
-
 main.cpp
 
     main(int argc, char **argv): Função principal do programa.
@@ -162,10 +149,6 @@ main.cpp
 maze.cpp
 
     initializeMaze(std::string path): Inicializa o labirinto com um caminho específico.
-
-maze.hpp
-
-    Não foram encontradas funções específicas neste arquivo.
 
 model.cpp
 
@@ -179,9 +162,6 @@ model.cpp
     render() const: Renderiza o modelo.
     setupVAO(GLuint program): Configura o Vertex Array Object do modelo.
 
-model.hpp
-
-    Não foram encontradas funções específicas neste arquivo.
 
 window.cpp
 
