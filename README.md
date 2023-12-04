@@ -1,7 +1,7 @@
 # Computação Gráfica - UFABC
 ## Atividade 3 - Aplicação interativa com gráficos 3D, iluminação e texturização
 
-Link WebAssembly: 
+Link WebAssembly: https://gabrielyuto.github.io/GoldCubesGame/public/GoldCubes.html
 Link para o vídeo do Youtube: https://www.youtube.com/watch?v=kAWeEBukILc
 
 ### Integrantes:
@@ -14,50 +14,98 @@ Registros Acadêmico:
 - 11201721879
 
 ### Descrição da aplicação
-O objetivo desta aplicação é criar um cenário de um labirinto em cubos, de modo que existem cubos dourados dentro deste labirito que precisam ser encontrados.
-
+O objetivo desta aplicação é criar um cenário de um labirinto em cubos, de modo que existe um cubo dourado dentro deste labirito que precisa ser encontrado.
 
 <div align="center">
 
-![Aplicação](./images/image3.png)
+![Aplicação](./images/image1.png)
 
 </div>
 
-A aplicação teve como base o projeto LookAt apresentado durante as aulas de laboratório. Dessa forma, foi construído um cenário em que é gerado um "solo" com base na classe ground.cpp e ground.hpp, e também é construído a classe camera.cpp e camera.hpp para se obter uma visão do espaço da camera a partir do espaço do mundo. Agpra também com a aplicação de texturas no chão e métodos de aplicação de texturas, sobras e luzes durante as aulas ministradas da disciplina
+A aplicação teve como base o projeto LookAt apresentado durante as aulas de laboratório e dos projetos de iluminação e texturização das viewers. Dessa forma, foi construído um cenário em que é gerado um "solo" com base em um arquivo obj nomeado como ground, e pilastras construídas com o obj wall. O cubo dourado e o troféu também são arquivos obj. Para a disposição das pilastras, utilizamos de uma classe maze que realiza a organização das pilastras com base na disposição de objetos mapeados no arquivo levels/map.txt. Em relação à classe model, foi utilizada com base nas aulas da disciplina, sendo a sua função permitir a criação dos parâmetros necessários para a construção dos arquivos obj e aplicação de texturização. Também é construído a classe camera.cpp e camera.hpp para se obter uma visão do espaço da camera a partir do espaço do mundo (foi utilizado os mesmos contextos abordados no projeto LookAt). Por fim, o controle de todas a implementação da criação dos cenários e controle de colisão com objetos foi implementado dentro da classe window.
 
 ### Implementação
-Para a implementação, primeiro foi feita uma modificação dos valores de core RGB do solo, atribuindo a cor da seguinte forma:
+Para explicar a implementação, iremos tomar como base a classe window, que faz uso das demais classes do projeto. O primeiro método disponibilizado nesta classe é o onEvent. Ele é responsável por gerenciar os eventos de tecla para movimentar a câmera.
+
+No método onCreate, é feito a inicialização dos modelos, fonte do texto de mensagem, camera e labirinto.
+Para carregar a fonte do texto, é realizado por meio da seguinte implementação, que irá buscar a fonte no path "fonts/Inconsolata-Medium.ttf"
 
 ```c++
-abcg::glUniform4f(m_colorLoc, 1.0, 0.0, 1.0, 1.0f);
-```
-
-Ja em relação a construção do cenário com cubos, simulando o labirinto, utilizamos dentro do método onPaint() alguns loops para renderizar o box.obj importado da pasta assets.
-Para a posicionamento dos cubos, foi a seguinte implementaçã0:
-
-```c++
-  const int limit_sup{50};
-  const int limit_inf{-50};
-  
-  for (int x = limit_inf; x < limit_sup; x++) {
-    for (int z = limit_inf; z < limit_sup; z++) {
-      glm::mat4 model{1.0f};
-      model = glm::translate(model, glm::vec3(x, 0.5f, z));
-      model = glm::rotate(model, glm::radians(10.0f), glm::vec3(0, 1, 0));
-      model = glm::scale(model, glm::vec3(0.5f));
-
-      abcg::glUniformMatrix4fv(m_modelMatrixLocation, 1, GL_FALSE, &model[0][0]);
-      abcg::glUniform4f(m_colorLocation, x, (x + z), z, 1.0f);
-      abcg::glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, nullptr);                  
-    }
+auto const filename{assetsPath + "fonts/Inconsolata-Medium.ttf"};
+  m_font = ImGui::GetIO().Fonts->AddFontFromFileTTF(filename.c_str(), 50.0f);
+  if (m_font == nullptr) {
+    throw abcg::RuntimeError("Cannot load font file");
   }
 ```
+E para inicializar os objetos, que são inicializados a partir da classe model.cpp e model.hpp, é feito da seguinte forma (na sequencia, é inicializado o solo, os pilares, o cubo dourado e o troféu):
 
-O primeiro loop descreve a posição no eixo x que iremos colocar os cubos, e o segundo loop descreve a posição no eixo z. Com base nesse vetor (x,z), temos as coordenadas da posição dos cubos, no qual é transladado por meio do método glm::translate.
-Adicionamos uma pequena rotação para criar um efeito mais interessante para a aplicação. E por fim, ajustamos a escala do objeto por meio do método glm::rotate e atribuimos uma cor ao cubo.
+```c++
+m_groundModel.loadObj(assetsPath + "models/ground.obj", false);
+m_groundModel.setupVAO(m_programs.at(0));
+
+m_wallModel.loadObj(assetsPath + "models/wall.obj", false);
+m_wallModel.setupVAO(m_programs.at(0));
+
+m_box.loadObj(assetsPath + "models/box.obj", false);
+m_box.setupVAO(m_programs.at(0));
+
+m_trophy.loadObj(assetsPath + "models/trophy.obj", false);
+m_trophy.setupVAO(m_programs.at(0));
+```
+Bem como também nesta classe é inicializado as propriedades de materiais (que são o mesmo para os modelos carregados pelo model.cpp):
+
+```c++
+m_Ka = m_wallModel.getKa();
+m_Kd = m_wallModel.getKd();
+m_Ks = m_wallModel.getKs();
+m_shininess = m_wallModel.getShininess();
+m_mappingMode = 3;
+```
+No método onPait, é renderizado o labirinto, o cubo dourado e o troféu (estes dois últimos seguindo a lógica da variável won, em que se o jogador ganhar, ela é definida como TRUE, e assim deixamos de renderizar o cubo dourado para renderizar o troféu).
+
+Em relação ao método onPaintUI, utilizamos o mesmo para a parte do texto, que é exibido quando o cubo dourado é encontrado.
+
+O método onResize utilizamos para ajustar a visão da câmera quando a janela do jogo é redimensionada.
+
+Já o método onUpdate faz a atualização do posicionamento da câmera quando é movimentado pelas teclas de seta.
+
+OnDestroy finaliza os m_programs.
+
+E por fim, para renderizar o labirinto, o cubo dourado e o troféu, foram criados métodos específicos:
+
+- renderMaze()
+- renderBox()
+- renderTrophy()
+
+Ambos os métodos seguem lógicas padrão para gerenciar os materias, iluminação, textura e matrizes de localização. O que há de especifico para cada um, além de diferenciar o material de textura, e a forma como posicionamos e aumentamos o tamanho dos objetos.
+
+Para a renderização dos pilares, é feito através de um loop for, da seguinte forma:
+```c++
+for (size_t i = 0; i < m_maze.m_mazeMatrix.size(); i++) {
+  for (size_t j = 0; j < m_maze.m_mazeMatrix[i].size(); j++) {
+    float xPos = static_cast<float>(i);
+    float yPos = static_cast<float>(j);
+
+    glm::mat4 modelMatrix{1.0f};
+    modelMatrix = glm::translate(modelMatrix, glm::vec3(xPos, 0.0f, yPos));
+    glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &modelMatrix[0][0]);
+
+    auto modelViewMatrix{glm::mat3(m_camera.m_viewMatrix * modelMatrix)};
+    glm::mat3 normalMatrix{glm::inverseTranspose(modelViewMatrix)};
+    glUniformMatrix3fv(normalMatrixLoc, 1, GL_FALSE, &normalMatrix[0][0]);
+
+    if (m_maze.isBox(i, j) && won == false) {
+      m_wallModel.render();
+    } else {
+      m_groundModel.render();
+    }
+  }
+}
+```
+
+O primeiro loop descreve a posição no eixo x que iremos colocar as pilastras, e o segundo loop descreve a posição no eixo z. Com base nesse vetor (x, y-fixo, z), temos as coordenadas da posição das pilastras, no qual é transladado por meio do método glm::translate.
 
 Um esquema detalhando a contrução do cenário é descrito na figura abaixo:
-
 
 <div align="center">
 
@@ -65,31 +113,43 @@ Um esquema detalhando a contrução do cenário é descrito na figura abaixo:
 
 </div>
 
-Tendo como base a geração dos primeiros cubos, repetimos o mesmo loop para gerar cubos acima dos mesmos, de modo a se construir paredes de cubos. A diferença se encontra no posicionamento no eixo y, a rotação dos objetos e a cor atribuido.
-
-
-Por fim, existe um loop for que gera cubos dourados em diversas direções dentro do cenário.
-A exemplificação de como ocorre essa geração e indicada no código abaixo:
-
+Para a renderização do cubo dourado, é feito através do método renderBox. O que é importante comentar do método, é que fizemos o posicionamento com o glm::translate e diminuimos o tamanho com o glm:scale, da seguinte forma:
 
 ```c++
-const int count_gold_cube{10};
+glm::mat4 modelMatrix{1.0f};
+modelMatrix = glm::translate(modelMatrix, cube_pos);
+modelMatrix = glm::scale(modelMatrix, glm::vec3(0.1f));
+glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &modelMatrix[0][0]);
 
-  for (int a = 0; a < count_gold_cube; a++) {
-    for(int b = 0; b  < count_gold_cube; b++){
-      glm::mat4 model{1.0f};
-      model = glm::translate(model, glm::vec3(a/2, 0.5f, b/2));
-      model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0, 1, 0));
-      model = glm::scale(model, glm::vec3(0.1f));
-
-      abcg::glUniformMatrix4fv(m_modelMatrixLocation, 1, GL_FALSE, &model[0][0]);
-      abcg::glUniform4f(m_colorLocation, 255, 223, 0.0, 1.0f);
-      abcg::glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, nullptr);
-    }
-  }
+auto modelViewMatrix{glm::mat3(m_camera.m_viewMatrix * modelMatrix)};
+glm::mat3 normalMatrix{glm::inverseTranspose(modelViewMatrix)};
+glUniformMatrix3fv(normalMatrixLoc, 1, GL_FALSE, &normalMatrix[0][0]);
 ````
+Além disso, neste método também incluímos o controle de colisão da câmera com o cubo dourado, através da seguinte implementação:
 
-Explicações das funções por arquivo do repositório:
+```c++
+// Verifica se colidiu ou não
+  float distance = glm::distance2(m_camera.getm_eye(), cube_pos);
+  if (distance < 0.05f) {
+    won = true;
+  }
+```
+
+Por fim, seguinte a mesma lógica, implementamos a renderização do troféu através do método enderTrophy da seguinte forma:
+
+```c++
+glm::mat4 modelMatrix{1.0f};
+modelMatrix = glm::translate(modelMatrix, trophy_pos);
+modelMatrix = glm::rotate(modelMatrix, glm::radians(90.0f), glm::vec3(0, 1, 0));
+modelMatrix = glm::scale(modelMatrix, glm::vec3(0.35f));
+glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &modelMatrix[0][0]);
+
+auto modelViewMatrix{glm::mat3(m_camera.m_viewMatrix * modelMatrix)};
+glm::mat3 normalMatrix{glm::inverseTranspose(modelViewMatrix)};
+glUniformMatrix3fv(normalMatrixLoc, 1, GL_FALSE, &normalMatrix[0][0]);
+```
+
+## Explicações das funções por arquivo do repositório:
 
 1. camera.cpp e camera.hpp
 
