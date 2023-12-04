@@ -19,7 +19,7 @@ O objetivo desta aplicação é criar um cenário de um labirinto em cubos, de m
 
 <div align="center">
 
-![Aplicação](./images/image.png)
+![Aplicação](./WhatsApp Image 2023-12-01 at 5.18.02 PM.jpeg)
 
 </div>
 
