@@ -1,8 +1,8 @@
 # Computação Gráfica - UFABC
 ## Atividade 3 - Aplicação interativa com gráficos 3D, iluminação e texturização
 
-Link WebAssembly: https://gabrielyuto.github.io/GoldCubesGame/public/GoldCubes.html
-Link para o vídeo do Youtube: https://www.youtube.com/watch?v=kAWeEBukILc
+- Link WebAssembly: https://gabrielyuto.github.io/GoldCubesGame/public/GoldCubes.html
+- Link para o vídeo do Youtube: https://www.youtube.com/watch?v=kAWeEBukILc
 
 ### Integrantes:
 Nomes:
@@ -135,7 +135,7 @@ Além disso, neste método também incluímos o controle de colisão da câmera 
   }
 ```
 
-Por fim, seguinte a mesma lógica, implementamos a renderização do troféu através do método enderTrophy da seguinte forma:
+Por fim, seguindo a mesma lógica, implementamos a renderização do troféu através do método renderTrophy da seguinte forma:
 
 ```c++
 glm::mat4 modelMatrix{1.0f};
